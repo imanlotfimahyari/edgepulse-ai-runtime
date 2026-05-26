@@ -3,39 +3,39 @@ from __future__ import annotations
 import argparse
 import random
 import time
-from datetime import datetime, timezone
+from uuid import uuid4
 
-import requests
-
-
-def generate_features(anomaly_rate: float) -> tuple[list[float], bool]:
-    is_anomaly = random.random() < anomaly_rate
-
-    if is_anomaly:
-        return [round(random.uniform(0.75, 1.20), 4) for _ in range(8)], True
-
-    return [round(random.uniform(0.05, 0.45), 4) for _ in range(8)], False
+from simulators.common.client import post_inference
+from simulators.common.payloads import (
+    is_anomaly_event,
+    normalized_feature_vector,
+    utc_timestamp,
+)
 
 
 def build_payload(device_id: str, anomaly_rate: float) -> dict:
-    features, generated_anomaly = generate_features(anomaly_rate)
+    anomaly = is_anomaly_event(anomaly_rate)
+    frame_id = f"frame-{uuid4().hex[:8]}"
 
     return {
         "device_id": device_id,
-        "device_type": "vibration_sensor",
-        "payload_type": "vibration",
-        "features": features,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "device_type": "camera_device",
+        "payload_type": "preprocessed_frame_features",
+        "features": normalized_feature_vector(anomaly=anomaly, size=10),
+        "timestamp": utc_timestamp(),
         "metadata": {
-            "generated_anomaly": generated_anomaly,
+            "generated_anomaly": anomaly,
+            "frame_id": frame_id,
+            "detected_objects": random.randint(0, 6),
+            "source": "simulated_camera_feature_extractor",
         },
     }
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Simulated vibration edge device.")
+    parser = argparse.ArgumentParser(description="Simulated camera-like edge device.")
     parser.add_argument("--endpoint", default="http://localhost:8080/infer")
-    parser.add_argument("--device-id", default="device-vibration-001")
+    parser.add_argument("--device-id", default="device-camera-001")
     parser.add_argument("--interval-seconds", type=float, default=2.0)
     parser.add_argument("--count", type=int, default=20)
     parser.add_argument("--anomaly-rate", type=float, default=0.05)
@@ -44,14 +44,12 @@ def main() -> None:
 
     for index in range(args.count):
         payload = build_payload(args.device_id, args.anomaly_rate)
+        result = post_inference(args.endpoint, payload)
 
-        response = requests.post(args.endpoint, json=payload, timeout=5)
-        response.raise_for_status()
-
-        result = response.json()
         print(
             f"[{index + 1}/{args.count}] "
             f"device={result['device_id']} "
+            f"type={result['device_type']} "
             f"prediction={result['prediction']} "
             f"score={result['anomaly_score']} "
             f"latency_ms={result['latency_ms']}"
