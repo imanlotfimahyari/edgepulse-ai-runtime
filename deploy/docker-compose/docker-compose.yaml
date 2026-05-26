@@ -1,0 +1,14 @@
+services:
+  edgepulse-runtime:
+    build:
+      context: ../../runtime
+      dockerfile: Dockerfile
+    container_name: edgepulse-runtime
+    environment:
+      SERVICE_NAME: edgepulse-ai-runtime
+      MODEL_NAME: edgepulse-anomaly-detector
+      MODEL_VERSION: 0.1.0
+      MODEL_BACKEND: rule-based
+      ANOMALY_THRESHOLD: 0.65
+    ports:
+      - "8080:8080"

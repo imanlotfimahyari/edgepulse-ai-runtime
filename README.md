@@ -1,13 +1,39 @@
 # EdgePulse AI Runtime
 
-EdgePulse AI Runtime is a personal cloud-to-edge observability and automation project.
+EdgePulse AI Runtime is a lightweight edge-AI runtime for industrial and IoT environments.
 
-The goal is to simulate distributed edge devices, collect their telemetry, detect abnormal behavior, and prepare a lightweight runtime that can later be deployed locally, in containers, or on Kubernetes.
+It ingests telemetry from simulated edge devices, runs local anomaly/inference logic, exposes Prometheus metrics, and can be deployed with Docker or lightweight Kubernetes.
 
-The first version focuses on:
+The project focuses on the platform layer around edge AI:
 
-- simulated edge-device telemetry
-- local runtime API
-- containerized development
-- pre-commit quality checks
-- future Kubernetes deployment manifests
+- telemetry ingestion;
+- containerized runtime packaging;
+- local inference/anomaly detection;
+- health and readiness endpoints;
+- Prometheus-compatible metrics;
+- repeatable deployment using Docker Compose now, and Kubernetes/Helm later.
+
+This is not an ML research project. The goal is to show how edge-AI workloads can be packaged, operated, observed, and deployed in a production-shaped way.
+
+## Current version
+
+`v0.1.0` includes:
+
+- FastAPI runtime;
+- rule-based anomaly detector;
+- vibration sensor simulator;
+- Docker Compose deployment;
+- Prometheus metrics endpoint.
+
+## Architecture
+
+```text
+Simulated Vibration Sensor
+        |
+        | HTTP
+        v
+EdgePulse AI Runtime
+        |
+        | /metrics
+        v
+Prometheus-compatible metrics
