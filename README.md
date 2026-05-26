@@ -107,3 +107,12 @@ python3 -m simulators.vibration_sensor.simulate \
   --interval-seconds 1 \
   --count 5 \
   --anomaly-rate 0.30
+
+## MQTT development note for WSL
+
+When testing MQTT from WSL with Docker Compose, make sure there is no local Mosquitto service already listening on port `1883`.
+
+Check:
+
+```bash
+sudo ss -ltnp | grep ':1883' || true
