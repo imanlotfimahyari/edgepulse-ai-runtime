@@ -18,6 +18,12 @@
     },
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
+  "mounts": [
+    "source=${localEnv:HOME}/.ssh/agent.sock,target=/tmp/ssh-agent.sock,type=bind"
+  ],
+  "remoteEnv": {
+    "SSH_AUTH_SOCK": "/tmp/ssh-agent.sock"
+  },
   "postCreateCommand": "pipx ensurepath && pipx install pre-commit || true && pre-commit install || true",
   "customizations": {
     "vscode": {
