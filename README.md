@@ -59,7 +59,7 @@ curl -s http://localhost:8080/metrics | grep edgepulse
 Run the vibration simulator:
 
 ```bash
-python3 edge-simulator/vibration_sensor/simulate.py \
+python3 -m simulators.vibration_sensor.simulate \
   --endpoint http://localhost:8080/infer \
   --interval-seconds 1 \
   --count 10 \
@@ -94,3 +94,16 @@ The first milestone implements a FastAPI-based edge runtime with rule-based anom
 - Add K3s/RKE2 deployment documentation.
 - Add ONNX Runtime backend.
 - Add Grafana dashboard and GitHub Actions CI.
+
+## Run all simulated edge devices
+
+The project includes multiple simulated edge devices. Each device sends synthetic telemetry to the EdgePulse runtime and receives a normal/anomaly prediction.
+
+Run the vibration sensor:
+
+```bash
+python3 -m simulators.vibration_sensor.simulate \
+  --endpoint http://localhost:8080/infer \
+  --interval-seconds 1 \
+  --count 5 \
+  --anomaly-rate 0.30

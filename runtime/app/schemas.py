@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -12,6 +12,7 @@ class InferenceRequest(BaseModel):
         ..., min_length=1, examples=[[0.12, 0.14, 0.19, 0.25, 0.22]]
     )
     timestamp: datetime | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class InferenceResponse(BaseModel):
