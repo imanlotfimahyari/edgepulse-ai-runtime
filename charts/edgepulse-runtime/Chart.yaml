@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: edgepulse-runtime
+description: Helm chart for EdgePulse AI Runtime with MQTT broker support
+type: application
+version: 0.3.0
+appVersion: "0.2.0"

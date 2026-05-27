@@ -8,6 +8,7 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
         args: ["--allow-multiple-documents"]
+        exclude: ^charts/.*/templates/.*\.ya?ml$
       - id: check-json
       - id: check-toml
       - id: check-merge-conflict
@@ -20,6 +21,7 @@ repos:
     hooks:
       - id: yamllint
         args: ["-d", "{extends: default, rules: {line-length: disable}}"]
+        exclude: ^charts/.*/templates/.*\.ya?ml$
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.7
