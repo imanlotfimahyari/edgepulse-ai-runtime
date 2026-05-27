@@ -17,8 +17,9 @@ runtime:
   env:
     serviceName: edgepulse-ai-runtime
     modelName: edgepulse-anomaly-detector
-    modelVersion: "0.2.0"
+    modelVersion: "0.3.0"
     modelBackend: rule-based
+    modelPath: /app/models/anomaly_score.onnx
     anomalyThreshold: "0.65"
     mqttEnabled: "true"
     mqttTopic: edge/devices/+/telemetry

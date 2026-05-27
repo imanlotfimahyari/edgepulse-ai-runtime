@@ -33,6 +33,8 @@ spec:
               value: {{ .Values.runtime.env.modelVersion | quote }}
             - name: MODEL_BACKEND
               value: {{ .Values.runtime.env.modelBackend | quote }}
+            - name: MODEL_PATH
+              value: {{ .Values.runtime.env.modelPath | quote }}
             - name: ANOMALY_THRESHOLD
               value: {{ .Values.runtime.env.anomalyThreshold | quote }}
             - name: MQTT_ENABLED
