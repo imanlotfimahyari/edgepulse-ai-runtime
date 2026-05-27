@@ -1,0 +1,52 @@
+---
+nameOverride: ""
+fullnameOverride: ""
+
+runtime:
+  replicaCount: 1
+
+  image:
+    repository: docker-compose-edgepulse-runtime
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 8080
+
+  env:
+    serviceName: edgepulse-ai-runtime
+    modelName: edgepulse-anomaly-detector
+    modelVersion: "0.2.0"
+    modelBackend: rule-based
+    anomalyThreshold: "0.65"
+    mqttEnabled: "true"
+    mqttTopic: edge/devices/+/telemetry
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+mqtt:
+  enabled: true
+
+  image:
+    repository: eclipse-mosquitto
+    tag: "2"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 1883
+
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi

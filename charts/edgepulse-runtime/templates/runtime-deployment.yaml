@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "edgepulse-runtime.fullname" . }}
+  labels:
+    {{- include "edgepulse-runtime.labels" . | nindent 4 }}
+    app.kubernetes.io/component: runtime
+spec:
+  replicas: {{ .Values.runtime.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "edgepulse-runtime.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: runtime
+  template:
+    metadata:
+      labels:
+        {{- include "edgepulse-runtime.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: runtime
+    spec:
+      containers:
+        - name: runtime
+          image: "{{ .Values.runtime.image.repository }}:{{ .Values.runtime.image.tag }}"
+          imagePullPolicy: {{ .Values.runtime.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SERVICE_NAME
+              value: {{ .Values.runtime.env.serviceName | quote }}
+            - name: MODEL_NAME
+              value: {{ .Values.runtime.env.modelName | quote }}
+            - name: MODEL_VERSION
+              value: {{ .Values.runtime.env.modelVersion | quote }}
+            - name: MODEL_BACKEND
+              value: {{ .Values.runtime.env.modelBackend | quote }}
+            - name: ANOMALY_THRESHOLD
+              value: {{ .Values.runtime.env.anomalyThreshold | quote }}
+            - name: MQTT_ENABLED
+              value: {{ .Values.runtime.env.mqttEnabled | quote }}
+            - name: MQTT_HOST
+              value: {{ include "edgepulse-runtime.mqttFullname" . | quote }}
+            - name: MQTT_PORT
+              value: {{ .Values.mqtt.service.port | quote }}
+            - name: MQTT_TOPIC
+              value: {{ .Values.runtime.env.mqttTopic | quote }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.runtime.resources | nindent 12 }}

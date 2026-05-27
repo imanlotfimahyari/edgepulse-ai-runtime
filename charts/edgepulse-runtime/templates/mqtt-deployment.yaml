@@ -1,0 +1,38 @@
+{{- if .Values.mqtt.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "edgepulse-runtime.mqttFullname" . }}
+  labels:
+    {{- include "edgepulse-runtime.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mqtt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "edgepulse-runtime.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mqtt
+  template:
+    metadata:
+      labels:
+        {{- include "edgepulse-runtime.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mqtt
+    spec:
+      containers:
+        - name: mqtt
+          image: "{{ .Values.mqtt.image.repository }}:{{ .Values.mqtt.image.tag }}"
+          imagePullPolicy: {{ .Values.mqtt.image.pullPolicy }}
+          ports:
+            - name: mqtt
+              containerPort: 1883
+          volumeMounts:
+            - name: mqtt-config
+              mountPath: /mosquitto/config/mosquitto.conf
+              subPath: mosquitto.conf
+          resources:
+            {{- toYaml .Values.mqtt.resources | nindent 12 }}
+      volumes:
+        - name: mqtt-config
+          configMap:
+            name: {{ include "edgepulse-runtime.mqttFullname" . }}-config
+{{- end }}
