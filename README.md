@@ -2,7 +2,7 @@
 
 EdgePulse AI Runtime is a lightweight edge-AI runtime for industrial and IoT environments.
 
-It ingests telemetry from simulated edge devices over HTTP or MQTT, runs local anomaly/inference logic, exposes Prometheus-compatible metrics, and can be deployed with Docker Compose. Kubernetes and Helm deployment are planned next.
+It ingests telemetry from simulated edge devices over HTTP or MQTT, runs local anomaly/inference logic, exposes Prometheus-compatible metrics, and can be deployed locally with Docker Compose or on Kubernetes with Helm.
 
 The project focuses on the platform layer around edge AI:
 
@@ -12,23 +12,29 @@ The project focuses on the platform layer around edge AI:
 - HTTP and MQTT ingestion paths;
 - health and readiness endpoints;
 - Prometheus-compatible metrics;
-- repeatable local deployment with Docker Compose.
+- Docker Compose deployment;
+- Helm-based Kubernetes deployment;
+- local K3s validation with k3d;
+- CI validation with GitHub Actions.
 
 This is not an ML research project. The goal is to show how edge-AI workloads can be packaged, operated, observed, and deployed in a production-shaped way.
 
 ## Current version
 
-`v0.2.0` includes:
+`v0.4.0` includes:
 
 - FastAPI runtime;
 - HTTP `/infer` endpoint;
 - MQTT telemetry consumer;
-- Mosquitto broker through Docker Compose;
+- Mosquitto broker through Docker Compose and Helm;
 - rule-based anomaly detector;
 - simulated vibration, temperature, power-meter, and camera-like devices;
 - Prometheus-compatible metrics;
 - ingestion labels for `http` and `mqtt`;
-- Docker Compose deployment.
+- Docker Compose deployment;
+- Helm chart for Kubernetes deployment;
+- local K3s/k3d deployment documentation;
+- GitHub Actions CI for pre-commit, Python checks, Helm rendering, and Docker image build.
 
 ## Architecture
 
@@ -55,6 +61,22 @@ This is not an ML research project. The goal is to show how edge-AI workloads ca
                                           |
                                           v
                            GET /metrics for observability
+```
+
+## Repository structure
+
+```text
+.
+├── charts/
+│   └── edgepulse-runtime/        # Helm chart
+├── deploy/
+│   └── docker-compose/           # Local Docker Compose stack
+├── docs/
+│   ├── architecture.md           # Runtime architecture notes
+│   ├── k3d-k3s-local.md          # Local K3s deployment guide
+│   └── troubleshooting.md        # Local troubleshooting notes
+├── runtime/                      # FastAPI runtime
+└── simulators/                   # HTTP/MQTT simulated edge devices
 ```
 
 ## Run locally with Docker Compose
@@ -209,9 +231,60 @@ Check device messages:
 curl -s http://localhost:8080/metrics | grep edgepulse_device_messages_total
 ```
 
+## Run on local K3s with k3d
+
+See:
+
+```text
+docs/k3d-k3s-local.md
+```
+
+Short version:
+
+```bash
+k3d cluster create edgepulse \
+  --servers 1 \
+  --agents 1
+
+docker build -t edgepulse-runtime:0.2.0 ./runtime
+k3d image import edgepulse-runtime:0.2.0 -c edgepulse
+
+helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
+  --namespace edgepulse \
+  --create-namespace \
+  --set runtime.image.repository=edgepulse-runtime \
+  --set runtime.image.tag=0.2.0 \
+  --set runtime.image.pullPolicy=IfNotPresent
+```
+
+Check:
+
+```bash
+kubectl -n edgepulse get pods -o wide
+```
+
+Expected:
+
+```text
+edgepulse-runtime-...        1/1 Running
+edgepulse-runtime-mqtt-...   1/1 Running
+```
+
+## CI
+
+GitHub Actions validates:
+
+- pre-commit checks;
+- Python syntax/import checks;
+- Ruff lint;
+- Ruff format check;
+- Helm lint;
+- Helm template rendering;
+- Docker image build.
+
 ## MQTT development note for WSL
 
-When testing MQTT from WSL with Docker Compose, make sure there is no local Mosquitto service already listening on port `1883`.
+When testing MQTT from WSL with Docker Compose or port-forwarding, make sure there is no local Mosquitto service already listening on port `1883`.
 
 Check:
 
@@ -219,7 +292,7 @@ Check:
 sudo ss -ltnp | grep ':1883' || true
 ```
 
-If a local Mosquitto service is running, stop it before using the Docker Compose broker:
+If a local Mosquitto service is running, stop it before using the Docker Compose broker or Kubernetes port-forward:
 
 ```bash
 sudo systemctl stop mosquitto || true
@@ -230,9 +303,9 @@ The simulators use `127.0.0.1` as the MQTT host to avoid `localhost` ambiguity i
 
 ## Roadmap
 
-- Add Helm chart for Kubernetes deployment.
-- Add K3s/kind deployment documentation.
 - Add ONNX Runtime backend.
+- Add model artifact loading and backend selection.
 - Add Grafana dashboard and Prometheus query examples.
-- Add GitHub Actions CI.
 - Add container scan workflow.
+- Add optional Kubernetes ServiceMonitor support.
+- Add release versioning and image publishing workflow.
