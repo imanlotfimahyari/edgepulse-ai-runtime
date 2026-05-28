@@ -16,7 +16,7 @@ The workflow:
 2. Generates an SPDX JSON SBOM.
 3. Uploads the SBOM as a GitHub Actions artifact.
 4. Scans the image for known vulnerabilities.
-5. Uploads vulnerability results as SARIF.
+5. Uploads vulnerability results as a SARIF workflow artifact.
 
 ## Image scanned
 
@@ -62,3 +62,16 @@ This complements the existing security checks:
 - `checkov` for Helm and Dockerfile checks;
 - pre-commit validation;
 - Docker image build validation.
+
+
+## SARIF artifact
+
+The vulnerability scan produces a SARIF artifact:
+
+```text
+edgepulse-runtime-vulnerability-sarif
+```
+
+The SARIF file is uploaded as a workflow artifact instead of being uploaded to GitHub Code Scanning.
+
+This keeps the workflow compatible with private repositories that may not have Code Scanning upload permissions or GitHub Advanced Security enabled.

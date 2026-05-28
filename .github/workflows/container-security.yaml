@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 env:
   LOCAL_IMAGE: edgepulse-runtime:security-scan
@@ -57,8 +56,10 @@ jobs:
           severity-cutoff: high
           output-format: sarif
 
-      - name: Upload vulnerability scan SARIF
-        uses: github/codeql-action/upload-sarif@v4
+      - name: Upload vulnerability SARIF artifact
         if: always() && steps.scan.outputs.sarif != ''
+        uses: actions/upload-artifact@v4
         with:
-          sarif_file: ${{ steps.scan.outputs.sarif }}
+          name: edgepulse-runtime-vulnerability-sarif
+          path: ${{ steps.scan.outputs.sarif }}
+          if-no-files-found: error
