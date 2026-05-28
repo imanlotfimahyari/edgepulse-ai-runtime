@@ -343,6 +343,14 @@ Optional Prometheus Operator `ServiceMonitor` support is documented in:
 docs/servicemonitor.md
 ```
 
+## Security
+
+Security notes and audit configuration are documented in:
+
+```text
+docs/security.md
+```
+
 ## CI
 
 GitHub Actions validates:
