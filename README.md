@@ -24,7 +24,7 @@ This is not an ML research project. The goal is to show how edge-AI workloads ca
 
 ## Current version
 
-`v0.6.0` includes:
+`v0.8.0` includes:
 
 - FastAPI runtime;
 - HTTP `/infer` endpoint;
@@ -42,7 +42,8 @@ This is not an ML research project. The goal is to show how edge-AI workloads ca
 - Helm chart for Kubernetes deployment;
 - local K3s/k3d deployment documentation;
 - GitHub Actions CI for pre-commit, Python checks, Helm rendering, and Docker image build;
-- Grafana dashboard and Prometheus query examples.
+- Grafana dashboard and Prometheus query examples;
+- GHCR image publishing, SBOM workflow, vulnerability scan, and Cosign image signing.
 
 ## Architecture
 
@@ -387,7 +388,7 @@ GitHub Actions validates:
 - Ruff format check;
 - Helm lint;
 - Helm template rendering;
-- Docker image build.
+- Docker image build;
 
 ## MQTT development note for WSL
 
