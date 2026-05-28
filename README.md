@@ -343,6 +343,26 @@ Optional Prometheus Operator `ServiceMonitor` support is documented in:
 docs/servicemonitor.md
 ```
 
+## Release image
+
+Runtime image publishing is documented in:
+
+```text
+docs/release.md
+```
+
+Image signing is documented in:
+
+```text
+docs/image-signing.md
+```
+
+Published runtime images use GitHub Container Registry:
+
+```text
+ghcr.io/imanlotfimahyari/edgepulse-runtime
+```
+
 ## Security
 
 Security notes and audit configuration are documented in:
@@ -391,5 +411,4 @@ The simulators use `127.0.0.1` as the MQTT host to avoid `localhost` ambiguity i
 ## Roadmap
 
 - Add release versioning and image publishing workflow.
-- Add signed image and SBOM generation.
 - Add model artifact versioning.
