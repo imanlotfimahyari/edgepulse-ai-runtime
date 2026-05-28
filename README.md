@@ -10,8 +10,11 @@ The project focuses on the platform layer around edge AI:
 - containerized runtime packaging;
 - local inference/anomaly detection;
 - HTTP and MQTT ingestion paths;
+- selectable inference backends;
+- ONNX Runtime inference support;
 - health and readiness endpoints;
 - Prometheus-compatible metrics;
+- Grafana dashboarding;
 - Docker Compose deployment;
 - Helm-based Kubernetes deployment;
 - local K3s validation with k3d;
@@ -21,20 +24,25 @@ This is not an ML research project. The goal is to show how edge-AI workloads ca
 
 ## Current version
 
-`v0.4.0` includes:
+`v0.6.0` includes:
 
 - FastAPI runtime;
 - HTTP `/infer` endpoint;
 - MQTT telemetry consumer;
 - Mosquitto broker through Docker Compose and Helm;
 - rule-based anomaly detector;
+- ONNX Runtime anomaly-scoring backend;
+- selectable backend through `MODEL_BACKEND`;
+- generated ONNX model artifact;
 - simulated vibration, temperature, power-meter, and camera-like devices;
 - Prometheus-compatible metrics;
 - ingestion labels for `http` and `mqtt`;
+- model backend labels for `rule-based` and `onnx`;
 - Docker Compose deployment;
 - Helm chart for Kubernetes deployment;
 - local K3s/k3d deployment documentation;
-- GitHub Actions CI for pre-commit, Python checks, Helm rendering, and Docker image build.
+- GitHub Actions CI for pre-commit, Python checks, Helm rendering, and Docker image build;
+- Grafana dashboard and Prometheus query examples.
 
 ## Architecture
 
@@ -55,12 +63,12 @@ This is not an ML research project. The goal is to show how edge-AI workloads ca
 | Broker            |      |-----------------------------|
 | edge/devices/...  |      | FastAPI                     |
 +-------------------+      | MQTT consumer               |
-                           | rule-based inference        |
+                           | rule-based / ONNX inference |
                            | Prometheus metrics          |
                            +--------------+--------------+
                                           |
                                           v
-                           GET /metrics for observability
+                           Grafana / Prometheus observability
 ```
 
 ## Repository structure
@@ -69,13 +77,17 @@ This is not an ML research project. The goal is to show how edge-AI workloads ca
 .
 ├── charts/
 │   └── edgepulse-runtime/        # Helm chart
+├── dashboards/
+│   └── grafana/                  # Grafana dashboard JSON
 ├── deploy/
 │   └── docker-compose/           # Local Docker Compose stack
 ├── docs/
 │   ├── architecture.md           # Runtime architecture notes
 │   ├── k3d-k3s-local.md          # Local K3s deployment guide
+│   ├── observability.md          # Metrics, PromQL, and Grafana docs
 │   └── troubleshooting.md        # Local troubleshooting notes
 ├── runtime/                      # FastAPI runtime
+├── scripts/                      # Utility scripts, including ONNX model generation
 └── simulators/                   # HTTP/MQTT simulated edge devices
 ```
 
@@ -85,6 +97,12 @@ Start the runtime and MQTT broker:
 
 ```bash
 docker compose -f deploy/docker-compose/docker-compose.yaml up --build
+```
+
+Start with ONNX backend:
+
+```bash
+MODEL_BACKEND=onnx docker compose -f deploy/docker-compose/docker-compose.yaml up --build
 ```
 
 In another terminal, test the runtime:
@@ -111,6 +129,28 @@ docker compose -f deploy/docker-compose/docker-compose.yaml down
 | `GET /model/info` | Current model metadata |
 | `POST /infer` | HTTP telemetry inference/anomaly endpoint |
 | `GET /metrics` | Prometheus-compatible metrics |
+
+## Inference backends
+
+The runtime supports two backends:
+
+| Backend | Description |
+|---|---|
+| `rule-based` | Lightweight score based on mean absolute feature value |
+| `onnx` | ONNX Runtime backend using the generated anomaly-scoring model |
+
+Select the backend with:
+
+```bash
+MODEL_BACKEND=rule-based
+MODEL_BACKEND=onnx
+```
+
+The ONNX model path is configured with:
+
+```bash
+MODEL_PATH=/app/models/anomaly_score.onnx
+```
 
 ## Run simulated devices over HTTP
 
@@ -225,6 +265,13 @@ curl -s http://localhost:8080/metrics | grep 'ingestion="mqtt"'
 curl -s http://localhost:8080/metrics | grep 'ingestion="http"'
 ```
 
+Check backend-specific inference metrics:
+
+```bash
+curl -s http://localhost:8080/metrics | grep 'model_backend="onnx"'
+curl -s http://localhost:8080/metrics | grep 'model_backend="rule-based"'
+```
+
 Check device messages:
 
 ```bash
@@ -270,6 +317,26 @@ edgepulse-runtime-...        1/1 Running
 edgepulse-runtime-mqtt-...   1/1 Running
 ```
 
+## Observability
+
+EdgePulse exposes Prometheus-compatible metrics through:
+
+```text
+GET /metrics
+```
+
+Observability documentation and Prometheus query examples are available in:
+
+```text
+docs/observability.md
+```
+
+A ready-to-import Grafana dashboard is available in:
+
+```text
+dashboards/grafana/edgepulse-overview.json
+```
+
 ## CI
 
 GitHub Actions validates:
@@ -303,9 +370,8 @@ The simulators use `127.0.0.1` as the MQTT host to avoid `localhost` ambiguity i
 
 ## Roadmap
 
-- Add ONNX Runtime backend.
-- Add model artifact loading and backend selection.
-- Add Grafana dashboard and Prometheus query examples.
-- Add container scan workflow.
 - Add optional Kubernetes ServiceMonitor support.
+- Add container scan workflow.
 - Add release versioning and image publishing workflow.
+- Add signed image and SBOM generation.
+- Add model artifact versioning.
