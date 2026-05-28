@@ -1,5 +1,3 @@
-minimum_pre_commit_version: "4.0.0"
-
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -30,15 +28,6 @@ repos:
         args: ["--fix"]
       - id: ruff-format
 
-  - repo: https://github.com/bridgecrewio/checkov.git
-    rev: 3.2.495
-    hooks:
-      - id: checkov
-        args:
-          - --quiet
-          - --skip-check
-          - CKV_SECRET_6
-
   - repo: https://github.com/pypa/pip-audit
     rev: v2.10.0
     hooks:
@@ -51,26 +40,22 @@ repos:
         args: ["-r", "simulators/requirements.txt"]
         pass_filenames: false
 
-  - repo: https://github.com/bridgecrewio/checkov
-    rev: 3.2.530
+  - repo: local
     hooks:
-      - id: checkov
+      - id: checkov-helm-chart
         name: checkov Helm chart
-        args:
-          - --directory
-          - charts/edgepulse-runtime
-          - --framework
-          - helm
-          - --soft-fail
-          - --quiet
+        entry: checkov -d charts/edgepulse-runtime --framework helm --soft-fail --quiet
+        language: python
+        additional_dependencies:
+          - checkov==3.2.530
         pass_filenames: false
-      - id: checkov
+        always_run: true
+
+      - id: checkov-dockerfile
         name: checkov Dockerfile
-        args:
-          - --file
-          - runtime/Dockerfile
-          - --framework
-          - dockerfile
-          - --soft-fail
-          - --quiet
+        entry: checkov -f runtime/Dockerfile --framework dockerfile --soft-fail --quiet
+        language: python
+        additional_dependencies:
+          - checkov==3.2.530
         pass_filenames: false
+        always_run: true
