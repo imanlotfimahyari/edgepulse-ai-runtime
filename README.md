@@ -337,6 +337,12 @@ A ready-to-import Grafana dashboard is available in:
 dashboards/grafana/edgepulse-overview.json
 ```
 
+Optional Prometheus Operator `ServiceMonitor` support is documented in:
+
+```text
+docs/servicemonitor.md
+```
+
 ## CI
 
 GitHub Actions validates:
@@ -370,7 +376,6 @@ The simulators use `127.0.0.1` as the MQTT host to avoid `localhost` ambiguity i
 
 ## Roadmap
 
-- Add optional Kubernetes ServiceMonitor support.
 - Add container scan workflow.
 - Add release versioning and image publishing workflow.
 - Add signed image and SBOM generation.

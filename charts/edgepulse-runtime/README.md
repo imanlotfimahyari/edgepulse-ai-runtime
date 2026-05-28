@@ -69,3 +69,33 @@ For a remote Kubernetes cluster, push the image to a registry accessible by the 
 --set runtime.image.repository=<registry>/edgepulse-runtime
 --set runtime.image.tag=<tag>
 ```
+
+## ServiceMonitor
+
+The chart can optionally create a Prometheus Operator `ServiceMonitor`.
+
+It is disabled by default:
+
+```yaml
+serviceMonitor:
+  enabled: false
+```
+
+Enable it when the Prometheus Operator CRDs are installed:
+
+```bash
+helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
+  --namespace edgepulse \
+  --create-namespace \
+  --set serviceMonitor.enabled=true
+```
+
+For kube-prometheus-stack installations that select ServiceMonitors by label:
+
+```bash
+helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
+  --namespace edgepulse \
+  --create-namespace \
+  --set serviceMonitor.enabled=true \
+  --set serviceMonitor.labels.release=kube-prometheus-stack
+```
