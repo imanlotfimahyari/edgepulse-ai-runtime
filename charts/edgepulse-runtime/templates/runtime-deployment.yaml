@@ -17,10 +17,16 @@ spec:
         {{- include "edgepulse-runtime.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: runtime
     spec:
+      serviceAccountName: {{ include "edgepulse-runtime.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: runtime
           image: "{{ .Values.runtime.image.repository }}:{{ .Values.runtime.image.tag }}"
           imagePullPolicy: {{ .Values.runtime.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.runtime.securityContext | nindent 12 }}
           ports:
             - name: http
               containerPort: 8080

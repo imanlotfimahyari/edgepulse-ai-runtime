@@ -18,10 +18,16 @@ spec:
         {{- include "edgepulse-runtime.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: mqtt
     spec:
+      serviceAccountName: {{ include "edgepulse-runtime.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: mqtt
           image: "{{ .Values.mqtt.image.repository }}:{{ .Values.mqtt.image.tag }}"
           imagePullPolicy: {{ .Values.mqtt.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.mqtt.securityContext | nindent 12 }}
           ports:
             - name: mqtt
               containerPort: 1883
@@ -29,10 +35,18 @@ spec:
             - name: mqtt-config
               mountPath: /mosquitto/config/mosquitto.conf
               subPath: mosquitto.conf
+            - name: mqtt-data
+              mountPath: /mosquitto/data
+            - name: mqtt-log
+              mountPath: /mosquitto/log
           resources:
             {{- toYaml .Values.mqtt.resources | nindent 12 }}
       volumes:
         - name: mqtt-config
           configMap:
             name: {{ include "edgepulse-runtime.mqttFullname" . }}-config
+        - name: mqtt-data
+          emptyDir: {}
+        - name: mqtt-log
+          emptyDir: {}
 {{- end }}
