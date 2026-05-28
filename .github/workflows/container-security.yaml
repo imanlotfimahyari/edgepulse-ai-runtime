@@ -49,7 +49,8 @@ jobs:
           if-no-files-found: error
 
       - name: Scan runtime image
-        uses: anchore/scan-action@v6
+        id: scan
+        uses: anchore/scan-action@v7
         with:
           image: ${{ env.LOCAL_IMAGE }}
           fail-build: false
@@ -58,6 +59,6 @@ jobs:
 
       - name: Upload vulnerability scan SARIF
         uses: github/codeql-action/upload-sarif@v4
-        if: always()
+        if: always() && steps.scan.outputs.sarif != ''
         with:
-          sarif_file: results.sarif
+          sarif_file: ${{ steps.scan.outputs.sarif }}
