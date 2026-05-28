@@ -1,0 +1,63 @@
+name: Container security
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+env:
+  LOCAL_IMAGE: edgepulse-runtime:security-scan
+
+jobs:
+  container-security:
+    name: Build, scan, and generate SBOM
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build runtime image locally
+        uses: docker/build-push-action@v6
+        with:
+          context: ./runtime
+          file: ./runtime/Dockerfile
+          load: true
+          tags: ${{ env.LOCAL_IMAGE }}
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.LOCAL_IMAGE }}
+          format: spdx-json
+          output-file: edgepulse-runtime.spdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: edgepulse-runtime-sbom
+          path: edgepulse-runtime.spdx.json
+          if-no-files-found: error
+
+      - name: Scan runtime image
+        uses: anchore/scan-action@v6
+        with:
+          image: ${{ env.LOCAL_IMAGE }}
+          fail-build: false
+          severity-cutoff: high
+          output-format: sarif
+
+      - name: Upload vulnerability scan SARIF
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: results.sarif
