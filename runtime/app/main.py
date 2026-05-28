@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from fastapi import FastAPI, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from app.config import settings
 from app.metrics import MODEL_INFO
+from app.model_manifest import load_model_manifest
 from app.mqtt_consumer import start_mqtt_consumer
 from app.schemas import InferenceRequest, InferenceResponse
 from app.service import process_inference_request
@@ -16,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 app = FastAPI(
     title="EdgePulse AI Runtime",
     description="Lightweight edge-AI runtime for simulated industrial and IoT telemetry.",
-    version="0.2.0",
+    version="0.8.0",
 )
 
 MODEL_INFO.labels(
@@ -49,12 +51,13 @@ def readyz() -> dict[str, str | bool]:
 
 
 @app.get("/model/info")
-def model_info() -> dict[str, str | float]:
+def model_info() -> dict[str, Any]:
     return {
         "model_name": settings.model_name,
         "model_version": settings.model_version,
         "model_backend": settings.model_backend,
         "anomaly_threshold": settings.anomaly_threshold,
+        "model_manifest": load_model_manifest(),
     }
 
 
