@@ -24,6 +24,13 @@ runtime:
     mqttEnabled: "true"
     mqttTopic: edge/devices/+/telemetry
 
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+
   resources:
     requests:
       cpu: 100m
@@ -44,6 +51,13 @@ mqtt:
     type: ClusterIP
     port: 1883
 
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+
   resources:
     requests:
       cpu: 25m
@@ -51,3 +65,13 @@ mqtt:
     limits:
       cpu: 100m
       memory: 128Mi
+
+
+serviceAccount:
+  create: true
+  name: ""
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault

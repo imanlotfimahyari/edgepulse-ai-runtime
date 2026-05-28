@@ -27,3 +27,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "edgepulse-runtime.mqttFullname" -}}
 {{- printf "%s-mqtt" (include "edgepulse-runtime.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
+
+{{- define "edgepulse-runtime.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create -}}
+{{- default (include "edgepulse-runtime.fullname" .) .Values.serviceAccount.name -}}
+{{- else -}}
+{{- default "default" .Values.serviceAccount.name -}}
+{{- end -}}
+{{- end -}}
