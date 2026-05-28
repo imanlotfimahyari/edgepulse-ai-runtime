@@ -351,6 +351,12 @@ Security notes and audit configuration are documented in:
 docs/security.md
 ```
 
+Container SBOM generation and vulnerability scanning are documented in:
+
+```text
+docs/container-security.md
+```
+
 ## CI
 
 GitHub Actions validates:
@@ -384,7 +390,6 @@ The simulators use `127.0.0.1` as the MQTT host to avoid `localhost` ambiguity i
 
 ## Roadmap
 
-- Add container scan workflow.
 - Add release versioning and image publishing workflow.
 - Add signed image and SBOM generation.
 - Add model artifact versioning.
