@@ -38,3 +38,39 @@ repos:
           - --quiet
           - --skip-check
           - CKV_SECRET_6
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.10.0
+    hooks:
+      - id: pip-audit
+        name: pip-audit runtime requirements
+        args: ["-r", "runtime/requirements.txt"]
+        pass_filenames: false
+      - id: pip-audit
+        name: pip-audit simulator requirements
+        args: ["-r", "simulators/requirements.txt"]
+        pass_filenames: false
+
+  - repo: https://github.com/bridgecrewio/checkov
+    rev: 3.2.530
+    hooks:
+      - id: checkov
+        name: checkov Helm chart
+        args:
+          - --directory
+          - charts/edgepulse-runtime
+          - --framework
+          - helm
+          - --soft-fail
+          - --quiet
+        pass_filenames: false
+      - id: checkov
+        name: checkov Dockerfile
+        args:
+          - --file
+          - runtime/Dockerfile
+          - --framework
+          - dockerfile
+          - --soft-fail
+          - --quiet
+        pass_filenames: false
