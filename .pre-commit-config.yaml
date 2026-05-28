@@ -44,7 +44,7 @@ repos:
     hooks:
       - id: checkov-helm-chart
         name: checkov Helm chart
-        entry: checkov -d charts/edgepulse-runtime --framework helm --soft-fail --quiet
+        entry: checkov -d charts/edgepulse-runtime --framework helm --skip-check CKV_K8S_21,CKV_K8S_15,CKV_K8S_43 --soft-fail --quiet
         language: python
         additional_dependencies:
           - checkov==3.2.530

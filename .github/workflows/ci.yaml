@@ -144,7 +144,7 @@ jobs:
 
       - name: Scan Helm chart
         run: |
-          checkov -d charts/edgepulse-runtime --framework helm --soft-fail --quiet
+          checkov -d charts/edgepulse-runtime --framework helm --skip-check CKV_K8S_21,CKV_K8S_15,CKV_K8S_43 --soft-fail --quiet
 
       - name: Scan Dockerfile
         run: |

@@ -7,7 +7,7 @@ runtime:
 
   image:
     repository: docker-compose-edgepulse-runtime
-    tag: latest
+    tag: "0.6.0"
     pullPolicy: IfNotPresent
 
   service:
@@ -25,6 +25,8 @@ runtime:
     mqttTopic: edge/devices/+/telemetry
 
   securityContext:
+    runAsUser: 10001
+    runAsGroup: 10001
     allowPrivilegeEscalation: false
     capabilities:
       drop:
@@ -52,6 +54,8 @@ mqtt:
     port: 1883
 
   securityContext:
+    runAsUser: 10001
+    runAsGroup: 10001
     allowPrivilegeEscalation: false
     capabilities:
       drop:
@@ -73,6 +77,8 @@ serviceAccount:
 
 podSecurityContext:
   runAsNonRoot: true
+  fsGroup: 10001
+  fsGroupChangePolicy: OnRootMismatch
   seccompProfile:
     type: RuntimeDefault
 
@@ -84,3 +90,12 @@ serviceMonitor:
   annotations: {}
   metricRelabelings: []
   relabelings: []
+
+
+networkPolicy:
+  enabled: true
+  annotations: {}
+  ingress:
+    enabled: true
+  egress:
+    enabled: false
