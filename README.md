@@ -310,15 +310,15 @@ k3d cluster create edgepulse \
   --servers 1 \
   --agents 1
 
-docker build -t edgepulse-runtime:0.2.0 ./runtime
-k3d image import edgepulse-runtime:0.2.0 -c edgepulse
-
 helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
   --namespace edgepulse \
-  --create-namespace \
-  --set runtime.image.repository=edgepulse-runtime \
-  --set runtime.image.tag=0.2.0 \
-  --set runtime.image.pullPolicy=IfNotPresent
+  --create-namespace
+```
+
+The default Helm values use the published runtime image:
+
+```text
+ghcr.io/imanlotfimahyari/edgepulse-runtime:0.9.0
 ```
 
 Check:
@@ -433,5 +433,13 @@ See the `LICENSE` file for details.
 
 ## Roadmap
 
-- Add release versioning and image publishing workflow.
-- Add model artifact versioning.
+Planned production-oriented improvements:
+
+- Add MQTT authentication and TLS.
+- Add device identity and per-device authorization.
+- Add end-to-end Docker Compose tests in CI.
+- Add GitOps deployment examples.
+- Add model registry integration.
+- Add signed model artifact support.
+- Add OpenTelemetry tracing.
+- Add Prometheus alerting examples.
