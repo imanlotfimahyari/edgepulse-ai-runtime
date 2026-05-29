@@ -24,7 +24,7 @@ This is not an ML research project. The goal is to show how edge-AI workloads ca
 
 ## Current version
 
-`v0.8.0` includes:
+`v0.9.0` includes:
 
 - FastAPI runtime;
 - HTTP `/infer` endpoint;

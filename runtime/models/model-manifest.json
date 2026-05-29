@@ -1,12 +1,12 @@
 {
   "model_name": "edgepulse-anomaly-detector",
-  "model_version": "0.8.0",
+  "model_version": "0.9.0",
   "model_backend": "onnxruntime",
   "model_format": "onnx",
   "model_path": "models/anomaly_score.onnx",
   "artifact_filename": "anomaly_score.onnx",
   "artifact_sha256": "a4b595306a4d185993cea50566acbb4a3895a283447d59f40caa5252c1c1b6d3",
   "artifact_size_bytes": 270,
-  "generated_at": "2026-05-28T23:32:08.028958+00:00",
+  "generated_at": "2026-05-29T19:30:45.481035+00:00",
   "description": "Demo ONNX anomaly scoring model for EdgePulse runtime."
 }
