@@ -30,3 +30,6 @@ tmp/
 
 # Local audit tooling
 .audit-venv/
+
+# Private local notes
+private-notes/
