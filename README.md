@@ -72,6 +72,22 @@ This is not an ML research project. The goal is to show how edge-AI workloads ca
                            Grafana / Prometheus observability
 ```
 
+## Project documentation
+
+Useful project guides:
+
+```text
+docs/demo-walkthrough.md
+docs/project-roadmap.md
+docs/architecture.md
+docs/observability.md
+docs/model-versioning.md
+docs/security.md
+docs/container-security.md
+docs/release.md
+docs/image-signing.md
+```
+
 ## Repository structure
 
 ```text
