@@ -80,12 +80,15 @@ Useful project guides:
 docs/demo-walkthrough.md
 docs/project-roadmap.md
 docs/architecture.md
+docs/k3d-k3s-local.md
 docs/observability.md
+docs/servicemonitor.md
 docs/model-versioning.md
 docs/security.md
 docs/container-security.md
 docs/release.md
 docs/image-signing.md
+docs/troubleshooting.md
 ```
 
 ## Repository structure
@@ -310,15 +313,15 @@ k3d cluster create edgepulse \
   --servers 1 \
   --agents 1
 
-docker build -t edgepulse-runtime:0.2.0 ./runtime
-k3d image import edgepulse-runtime:0.2.0 -c edgepulse
-
 helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
   --namespace edgepulse \
-  --create-namespace \
-  --set runtime.image.repository=edgepulse-runtime \
-  --set runtime.image.tag=0.2.0 \
-  --set runtime.image.pullPolicy=IfNotPresent
+  --create-namespace
+```
+
+The default Helm values use the published runtime image:
+
+```text
+ghcr.io/imanlotfimahyari/edgepulse-runtime:0.9.0
 ```
 
 Check:
@@ -405,6 +408,10 @@ GitHub Actions validates:
 - Helm lint;
 - Helm template rendering;
 - Docker image build;
+- dependency audit;
+- IaC security scanning;
+- container SBOM generation;
+- container vulnerability scanning.
 
 ## MQTT development note for WSL
 
@@ -427,5 +434,13 @@ The simulators use `127.0.0.1` as the MQTT host to avoid `localhost` ambiguity i
 
 ## Roadmap
 
-- Add release versioning and image publishing workflow.
-- Add model artifact versioning.
+Planned production-oriented improvements:
+
+- Add MQTT authentication and TLS.
+- Add device identity and per-device authorization.
+- Add end-to-end Docker Compose tests in CI.
+- Add GitOps deployment examples.
+- Add model registry integration.
+- Add signed model artifact support.
+- Add OpenTelemetry tracing.
+- Add Prometheus alerting examples.
