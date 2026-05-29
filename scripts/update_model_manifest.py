@@ -32,7 +32,7 @@ def main() -> None:
         help="Path where the manifest will be written.",
     )
     parser.add_argument("--model-name", default="edgepulse-anomaly-detector")
-    parser.add_argument("--model-version", default="0.8.0")
+    parser.add_argument("--model-version", default="0.9.0")
     parser.add_argument("--model-backend", default="onnxruntime")
     parser.add_argument("--model-format", default="onnx")
     parser.add_argument(

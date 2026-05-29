@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 app = FastAPI(
     title="EdgePulse AI Runtime",
     description="Lightweight edge-AI runtime for simulated industrial and IoT telemetry.",
-    version="0.8.0",
+    version="0.9.0",
 )
 
 MODEL_INFO.labels(
