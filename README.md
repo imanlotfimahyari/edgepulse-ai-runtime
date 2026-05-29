@@ -425,6 +425,12 @@ sudo pkill mosquitto || true
 
 The simulators use `127.0.0.1` as the MQTT host to avoid `localhost` ambiguity in WSL/Docker Desktop environments.
 
+## License
+
+This project is licensed under the Apache License 2.0.
+
+See the `LICENSE` file for details.
+
 ## Roadmap
 
 - Add release versioning and image publishing workflow.
