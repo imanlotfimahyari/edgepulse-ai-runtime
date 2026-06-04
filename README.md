@@ -22,6 +22,11 @@ The project focuses on the platform layer around edge AI:
 
 This is not an ML research project. The goal is to show how edge-AI workloads can be packaged, operated, observed, and deployed in a production-shaped way.
 
+## Why this project matters
+
+Most edge-AI examples focus only on model inference. This project focuses on the operational layer around edge AI: packaging, deployment, telemetry ingestion, observability, runtime health checks, CI validation, and Kubernetes delivery.
+
+The goal is to demonstrate production-shaped edge-AI infrastructure rather than only ML model development.
 ## Current version
 
 `v0.9.0` includes:
