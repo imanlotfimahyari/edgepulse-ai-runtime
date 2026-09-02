@@ -156,3 +156,36 @@ jobs:
       - name: Scan Dockerfile
         run: |
           checkov -f runtime/Dockerfile --framework dockerfile --soft-fail --quiet
+
+  compose-e2e:
+    name: Compose E2E
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Run Compose E2E test
+        run: |
+          docker compose \
+            -f deploy/docker-compose/docker-compose.yaml \
+            --profile e2e \
+            up --build \
+            --abort-on-container-exit \
+            --exit-code-from e2e
+
+      - name: Show Compose logs
+        if: always()
+        run: |
+          docker compose \
+            -f deploy/docker-compose/docker-compose.yaml \
+            --profile e2e \
+            logs --no-color
+
+      - name: Stop Compose stack
+        if: always()
+        run: |
+          docker compose \
+            -f deploy/docker-compose/docker-compose.yaml \
+            --profile e2e \
+            down -v --remove-orphans
