@@ -118,3 +118,36 @@ def test_readyz_reports_not_ready_when_initialization_fails(monkeypatch) -> None
     assert body["status"] == "not-ready"
     assert body["model_backend"] == "onnx"
     assert body["error"] == "model unavailable"
+
+
+def test_readyz_reports_not_ready_when_mqtt_disconnected(monkeypatch) -> None:
+    from app import main
+
+    monkeypatch.setattr(main.settings, "mqtt_enabled", True)
+    monkeypatch.setattr(main, "start_mqtt_consumer", lambda: None)
+    monkeypatch.setattr(main, "is_mqtt_connected", lambda: False)
+
+    with TestClient(main.app) as test_client:
+        response = test_client.get("/readyz")
+
+    assert response.status_code == 503
+
+    body = response.json()
+
+    assert body["status"] == "not-ready"
+    assert body["mqtt_enabled"] is True
+    assert body["error"] == "mqtt broker not connected"
+
+
+def test_readyz_is_ready_when_mqtt_connected(monkeypatch) -> None:
+    from app import main
+
+    monkeypatch.setattr(main.settings, "mqtt_enabled", True)
+    monkeypatch.setattr(main, "start_mqtt_consumer", lambda: None)
+    monkeypatch.setattr(main, "is_mqtt_connected", lambda: True)
+
+    with TestClient(main.app) as test_client:
+        response = test_client.get("/readyz")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"

@@ -110,3 +110,142 @@ def test_schema_invalid_mqtt_message_counts_error(monkeypatch) -> None:
     )
 
     assert fake_errors.count == 1
+
+
+def test_on_connect_marks_mqtt_connected(monkeypatch) -> None:
+    class FakeMetric:
+        def __init__(self) -> None:
+            self.value = None
+
+        def set(self, value) -> None:
+            self.value = value
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.topic = None
+
+        def subscribe(self, topic):
+            self.topic = topic
+
+    fake_metric = FakeMetric()
+    fake_client = FakeClient()
+
+    monkeypatch.setattr(
+        mqtt_consumer,
+        "MQTT_CONNECTED",
+        fake_metric,
+    )
+
+    mqtt_consumer._mqtt_connected.clear()
+
+    mqtt_consumer._on_connect(
+        fake_client,
+        None,
+        None,
+        0,
+        None,
+    )
+
+    assert mqtt_consumer.is_mqtt_connected() is True
+    assert fake_metric.value == 1
+    assert fake_client.topic == mqtt_consumer.settings.mqtt_topic
+
+
+def test_on_connect_failure_marks_mqtt_disconnected(monkeypatch) -> None:
+    class FakeMetric:
+        def __init__(self) -> None:
+            self.value = None
+
+        def set(self, value) -> None:
+            self.value = value
+
+    class FakeClient:
+        def subscribe(self, topic):
+            raise AssertionError("subscribe must not be called")
+
+    fake_metric = FakeMetric()
+
+    monkeypatch.setattr(
+        mqtt_consumer,
+        "MQTT_CONNECTED",
+        fake_metric,
+    )
+
+    mqtt_consumer._mqtt_connected.set()
+
+    mqtt_consumer._on_connect(
+        FakeClient(),
+        None,
+        None,
+        1,
+        None,
+    )
+
+    assert mqtt_consumer.is_mqtt_connected() is False
+    assert fake_metric.value == 0
+
+
+def test_on_disconnect_marks_mqtt_disconnected(monkeypatch) -> None:
+    class FakeMetric:
+        def __init__(self) -> None:
+            self.value = None
+
+        def set(self, value) -> None:
+            self.value = value
+
+    fake_metric = FakeMetric()
+
+    monkeypatch.setattr(
+        mqtt_consumer,
+        "MQTT_CONNECTED",
+        fake_metric,
+    )
+
+    mqtt_consumer._mqtt_connected.set()
+
+    mqtt_consumer._on_disconnect(
+        None,
+        None,
+        None,
+        1,
+        None,
+    )
+
+    assert mqtt_consumer.is_mqtt_connected() is False
+    assert fake_metric.value == 0
+
+
+def test_mqtt_consumer_configures_async_reconnect(monkeypatch) -> None:
+    calls = {}
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs) -> None:
+            self.on_connect = None
+            self.on_connect_fail = None
+            self.on_disconnect = None
+            self.on_message = None
+
+        def reconnect_delay_set(self, min_delay, max_delay) -> None:
+            calls["reconnect_delay"] = (min_delay, max_delay)
+
+        def connect_async(self, host, port, keepalive) -> None:
+            calls["connect_async"] = (host, port, keepalive)
+
+        def loop_forever(self, retry_first_connection=False) -> None:
+            calls["retry_first_connection"] = retry_first_connection
+
+    monkeypatch.setattr(
+        mqtt_consumer.mqtt,
+        "Client",
+        FakeClient,
+    )
+
+    mqtt_consumer._run_mqtt_consumer()
+
+    assert calls["reconnect_delay"] == (1, 30)
+    assert calls["connect_async"] == (
+        mqtt_consumer.settings.mqtt_host,
+        mqtt_consumer.settings.mqtt_port,
+        60,
+    )
+    assert calls["retry_first_connection"] is True
