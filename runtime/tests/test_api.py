@@ -91,3 +91,30 @@ def test_metrics(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert "edgepulse_" in response.text
+
+
+def test_readyz_reports_not_ready_when_initialization_fails(monkeypatch) -> None:
+    from app import main
+
+    monkeypatch.setattr(main.settings, "model_backend", "onnx")
+    monkeypatch.setattr(main.settings, "mqtt_enabled", False)
+
+    def fail_to_load_model():
+        raise RuntimeError("model unavailable")
+
+    monkeypatch.setattr(
+        main.inference,
+        "_get_onnx_session",
+        fail_to_load_model,
+    )
+
+    with TestClient(main.app) as test_client:
+        response = test_client.get("/readyz")
+
+    assert response.status_code == 503
+
+    body = response.json()
+
+    assert body["status"] == "not-ready"
+    assert body["model_backend"] == "onnx"
+    assert body["error"] == "model unavailable"
