@@ -1,11 +1,11 @@
 services:
   mqtt:
-    image: eclipse-mosquitto:2
+    build:
+      context: .
+      dockerfile: Dockerfile.mosquitto
     container_name: edgepulse-mqtt
     ports:
       - "1883:1883"
-    volumes:
-      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
 
   edgepulse-runtime:
     build:
@@ -15,7 +15,7 @@ services:
     environment:
       SERVICE_NAME: edgepulse-ai-runtime
       MODEL_NAME: edgepulse-anomaly-detector
-      MODEL_VERSION: ${MODEL_VERSION:-0.3.0}
+      MODEL_VERSION: ${MODEL_VERSION:-0.9.0}
       MODEL_BACKEND: ${MODEL_BACKEND:-rule-based}
       ANOMALY_THRESHOLD: ${ANOMALY_THRESHOLD:-0.65}
       MQTT_ENABLED: "true"
@@ -26,3 +26,17 @@ services:
       - "8080:8080"
     depends_on:
       - mqtt
+
+  e2e:
+    build:
+      context: ../..
+      dockerfile: deploy/docker-compose/Dockerfile.e2e
+    environment:
+      EDGEPULSE_BASE_URL: http://edgepulse-runtime:8080
+      EDGEPULSE_MQTT_HOST: mqtt
+      EDGEPULSE_MQTT_PORT: "1883"
+    depends_on:
+      edgepulse-runtime:
+        condition: service_healthy
+    profiles:
+      - e2e
