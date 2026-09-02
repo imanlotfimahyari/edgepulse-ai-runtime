@@ -24,6 +24,27 @@ def start_mqtt_consumer() -> None:
     thread.start()
 
 
+def _configure_mqtt_security(client: mqtt.Client) -> None:
+    if settings.mqtt_username is not None:
+        password = (
+            settings.mqtt_password.get_secret_value()
+            if settings.mqtt_password is not None
+            else None
+        )
+
+        client.username_pw_set(
+            username=settings.mqtt_username,
+            password=password,
+        )
+
+    if settings.mqtt_tls_enabled:
+        client.tls_set(
+            ca_certs=settings.mqtt_tls_ca_file,
+            certfile=settings.mqtt_tls_cert_file,
+            keyfile=settings.mqtt_tls_key_file,
+        )
+
+
 def _run_mqtt_consumer() -> None:
     client = mqtt.Client(
         callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
@@ -35,11 +56,15 @@ def _run_mqtt_consumer() -> None:
     client.on_disconnect = _on_disconnect
     client.on_message = _on_message
 
+    _configure_mqtt_security(client)
+
     logger.info(
-        "Starting MQTT consumer host=%s port=%s topic=%s",
+        "Starting MQTT consumer host=%s port=%s topic=%s tls=%s auth=%s",
         settings.mqtt_host,
         settings.mqtt_port,
         settings.mqtt_topic,
+        settings.mqtt_tls_enabled,
+        settings.mqtt_username is not None,
     )
 
     client.reconnect_delay_set(

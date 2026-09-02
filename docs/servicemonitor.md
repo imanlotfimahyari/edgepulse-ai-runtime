@@ -1,10 +1,10 @@
 # ServiceMonitor Support
 
-The Helm chart can optionally create a `ServiceMonitor` for Prometheus Operator based monitoring.
+The Helm chart can optionally create a Prometheus Operator `ServiceMonitor` for the EdgePulse runtime.
 
-This is disabled by default because not every Kubernetes cluster has the Prometheus Operator CRDs installed.
+It is disabled by default because the `ServiceMonitor` CRD is not installed in every Kubernetes cluster.
 
-## Enable ServiceMonitor
+## Enable it
 
 ```bash
 helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
@@ -13,11 +13,47 @@ helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
   --set serviceMonitor.enabled=true
 ```
 
-## Enable with kube-prometheus-stack labels
+Render before installing:
 
-Some kube-prometheus-stack installations select ServiceMonitors by label.
+```bash
+helm template edgepulse-runtime charts/edgepulse-runtime \
+  --set serviceMonitor.enabled=true \
+  > /tmp/edgepulse-servicemonitor.yaml
+```
 
-Example:
+Confirm:
+
+```bash
+grep -n 'kind: ServiceMonitor' /tmp/edgepulse-servicemonitor.yaml
+```
+
+## Default scrape behavior
+
+The ServiceMonitor scrapes:
+
+```text
+path: /metrics
+runtime Service port: http
+```
+
+Default chart values include:
+
+```yaml
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+  annotations: {}
+  metricRelabelings: []
+  relabelings: []
+```
+
+## kube-prometheus-stack selector labels
+
+Prometheus Operator installations often select ServiceMonitors using labels.
+
+For example:
 
 ```bash
 helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
@@ -27,39 +63,52 @@ helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
   --set serviceMonitor.labels.release=kube-prometheus-stack
 ```
 
-## Render locally
+Use the label expected by your Prometheus resource; the exact selector is cluster-specific.
 
-```bash
-helm template edgepulse-runtime charts/edgepulse-runtime \
-  --set serviceMonitor.enabled=true
-```
+## Requirements
 
-Expected resource:
+The cluster must have the CRD:
 
 ```text
+monitoring.coreos.com/v1
 kind: ServiceMonitor
 ```
 
-## Metrics endpoint
+Check:
 
-The ServiceMonitor scrapes:
-
-```text
-/metrics
+```bash
+kubectl get crd servicemonitors.monitoring.coreos.com
 ```
 
-on the runtime Service port:
+If it is not installed, leave:
 
-```text
-http
+```yaml
+serviceMonitor:
+  enabled: false
 ```
 
-## Notes
+## Troubleshooting
 
-The ServiceMonitor requires the Prometheus Operator CRD:
+If the ServiceMonitor exists but Prometheus does not scrape EdgePulse:
 
-```text
-monitoring.coreos.com/v1 ServiceMonitor
+1. inspect the ServiceMonitor:
+
+```bash
+kubectl -n edgepulse get servicemonitor -o yaml
 ```
 
-If the CRD is not installed, keep `serviceMonitor.enabled=false`.
+2. confirm the runtime Service exposes the named `http` port:
+
+```bash
+kubectl -n edgepulse get svc edgepulse-runtime -o yaml
+```
+
+3. confirm the Prometheus resource selects the ServiceMonitor labels;
+4. verify the runtime `/metrics` endpoint directly with a port-forward.
+
+```bash
+kubectl -n edgepulse port-forward svc/edgepulse-runtime 8080:8080
+curl -s http://localhost:8080/metrics | head
+```
+
+See `docs/observability.md` for metric and PromQL examples.

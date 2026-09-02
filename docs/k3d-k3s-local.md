@@ -2,16 +2,16 @@
 
 This guide runs EdgePulse AI Runtime on a local K3s cluster using k3d.
 
-k3d runs real K3s inside Docker containers, which makes it convenient for laptop-based Kubernetes testing.
+k3d runs K3s nodes inside Docker containers, which makes it useful for validating the Helm chart and Kubernetes behavior from a workstation.
 
 ## Prerequisites
 
-Required tools:
+Required:
 
-- Docker Desktop with WSL integration enabled
-- k3d
-- kubectl
-- Helm
+- Docker Desktop with WSL integration when using Windows/WSL;
+- k3d;
+- kubectl;
+- Helm.
 
 Check:
 
@@ -22,7 +22,7 @@ kubectl version --client
 helm version
 ```
 
-## Create the local K3s cluster
+## Create the cluster
 
 ```bash
 k3d cluster create edgepulse \
@@ -30,85 +30,91 @@ k3d cluster create edgepulse \
   --agents 1
 ```
 
-Check the nodes:
+Verify:
 
 ```bash
 kubectl get nodes -o wide
 ```
 
-Expected result:
+Expected nodes include:
 
 ```text
 k3d-edgepulse-server-0   Ready
 k3d-edgepulse-agent-0    Ready
 ```
 
-## Build and import the runtime image
+## Option A: use the published image
 
-Build the runtime image:
+The chart defaults to:
 
-```bash
-docker build -t edgepulse-runtime:0.2.0 ./runtime
+```text
+ghcr.io/imanlotfimahyari/edgepulse-runtime:0.9.0
 ```
 
-Import it into the k3d cluster:
+If the image is accessible from the cluster, install directly:
 
 ```bash
-k3d image import edgepulse-runtime:0.2.0 -c edgepulse
+helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
+  --namespace edgepulse \
+  --create-namespace
 ```
 
-This is required because the K3s cluster runs inside Docker and does not automatically see every local Docker image.
+## Option B: test a local image
 
-## Install the Helm chart
+Build:
+
+```bash
+docker build -t edgepulse-runtime:0.9.0 ./runtime
+```
+
+Import into k3d:
+
+```bash
+k3d image import edgepulse-runtime:0.9.0 -c edgepulse
+```
+
+Install using the imported image:
 
 ```bash
 helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
   --namespace edgepulse \
   --create-namespace \
   --set runtime.image.repository=edgepulse-runtime \
-  --set runtime.image.tag=0.2.0 \
+  --set runtime.image.tag=0.9.0 \
   --set runtime.image.pullPolicy=IfNotPresent
 ```
 
-## Check Kubernetes resources
+## Check resources
 
 ```bash
-kubectl -n edgepulse get all
 kubectl -n edgepulse get pods -o wide
+kubectl -n edgepulse get svc
+kubectl -n edgepulse get networkpolicy
 ```
 
-Expected pods:
+With the bundled broker enabled, expect runtime and MQTT pods.
 
-```text
-edgepulse-runtime-...        1/1 Running
-edgepulse-runtime-mqtt-...   1/1 Running
-```
-
-## Check logs
+Check runtime logs:
 
 ```bash
 kubectl -n edgepulse logs deploy/edgepulse-runtime
+```
+
+Check broker logs:
+
+```bash
 kubectl -n edgepulse logs deploy/edgepulse-runtime-mqtt
 ```
 
-The runtime logs should show that the MQTT consumer started and connected successfully.
+## Check runtime readiness
 
-Expected runtime log pattern:
-
-```text
-Starting MQTT consumer host=edgepulse-runtime-mqtt port=1883 topic=edge/devices/+/telemetry
-MQTT connected reason_code=Success
-```
-
-## Port-forward the runtime service
-
-Open a terminal and keep this command running:
+Port-forward the runtime:
 
 ```bash
 kubectl -n edgepulse port-forward svc/edgepulse-runtime 8080:8080
 ```
 
-In another terminal, test the runtime:
+In another terminal:
 
 ```bash
 curl -s http://localhost:8080/healthz | jq
@@ -116,21 +122,9 @@ curl -s http://localhost:8080/readyz | jq
 curl -s http://localhost:8080/model/info | jq
 ```
 
-Expected readiness response:
-
-```json
-{
-  "status": "ready",
-  "model_name": "edgepulse-anomaly-detector",
-  "model_version": "0.2.0",
-  "model_backend": "rule-based",
-  "mqtt_enabled": true
-}
-```
+The readiness response should report the current `0.9.0` model metadata and indicate whether MQTT is enabled.
 
 ## Test HTTP ingestion
-
-With the runtime port-forward still running:
 
 ```bash
 python3 -m simulators.vibration_sensor.simulate \
@@ -141,44 +135,30 @@ python3 -m simulators.vibration_sensor.simulate \
   --anomaly-rate 0.30
 ```
 
-Check HTTP metrics:
+Check metrics:
 
 ```bash
 curl -s http://localhost:8080/metrics | grep 'ingestion="http"'
 ```
 
-Expected result: metrics should include `ingestion="http"`.
+## Default MQTT mode
 
-## Port-forward the MQTT broker
+For backwards-compatible local Kubernetes testing, the chart's default secure-MQTT switches are disabled unless you enable them in values.
 
-Open another terminal and keep this command running:
+When using the default broker service port, port-forward it with:
 
 ```bash
 kubectl -n edgepulse port-forward svc/edgepulse-runtime-mqtt 1883:1883
 ```
 
-If WSL has a local Mosquitto service already using port `1883`, stop it first:
-
-```bash
-sudo systemctl stop mosquitto || true
-sudo pkill mosquitto || true
-```
-
-Check port usage:
+If WSL already has a local service using port `1883`:
 
 ```bash
 sudo ss -ltnp | grep ':1883' || true
+sudo systemctl stop mosquitto || true
 ```
 
-Expected result while port-forward is active:
-
-```text
-kubectl ... 127.0.0.1:1883
-```
-
-## Test MQTT ingestion
-
-With both port-forwards running, publish telemetry from all simulated devices:
+A plaintext simulator test can then use:
 
 ```bash
 python3 -m simulators.vibration_sensor.simulate \
@@ -188,57 +168,96 @@ python3 -m simulators.vibration_sensor.simulate \
   --count 5 \
   --interval-seconds 1 \
   --anomaly-rate 0.30
-
-python3 -m simulators.temperature_sensor.simulate \
-  --mode mqtt \
-  --mqtt-host 127.0.0.1 \
-  --mqtt-port 1883 \
-  --count 5 \
-  --interval-seconds 1 \
-  --anomaly-rate 0.30
-
-python3 -m simulators.power_meter.simulate \
-  --mode mqtt \
-  --mqtt-host 127.0.0.1 \
-  --mqtt-port 1883 \
-  --count 5 \
-  --interval-seconds 1 \
-  --anomaly-rate 0.30
-
-python3 -m simulators.camera_device.simulate \
-  --mode mqtt \
-  --mqtt-host 127.0.0.1 \
-  --mqtt-port 1883 \
-  --count 5 \
-  --interval-seconds 1 \
-  --anomaly-rate 0.30
 ```
 
-Check MQTT metrics:
+Verify:
 
 ```bash
 curl -s http://localhost:8080/metrics | grep edgepulse_mqtt_messages_total
 curl -s http://localhost:8080/metrics | grep 'ingestion="mqtt"'
-curl -s http://localhost:8080/metrics | grep edgepulse_device_messages_total
 ```
 
-Expected result: metrics should include all four device types:
+## Secure MQTT on Kubernetes
+
+For a production-shaped secure deployment, enable broker authentication/TLS and runtime credentials/trust through existing Secrets.
+
+The required secret responsibilities are:
 
 ```text
-device_type="vibration_sensor"
-device_type="temperature_sensor"
-device_type="power_meter"
-device_type="camera_device"
+edgepulse-mqtt-passwords
+  └── Mosquitto password file
+
+edgepulse-mqtt-server-tls
+  ├── tls.crt
+  └── tls.key
+
+edgepulse-runtime-mqtt-auth
+  ├── username
+  └── password
+
+edgepulse-runtime-mqtt-ca
+  └── ca.crt
 ```
 
-## Uninstall the Helm release
+Example values:
+
+```yaml
+mqtt:
+  service:
+    port: 8883
+
+  auth:
+    enabled: true
+    existingSecret: edgepulse-mqtt-passwords
+
+  tls:
+    enabled: true
+    existingSecret: edgepulse-mqtt-server-tls
+
+runtime:
+  mqtt:
+    auth:
+      enabled: true
+      existingSecret: edgepulse-runtime-mqtt-auth
+
+    tls:
+      enabled: true
+      existingSecret: edgepulse-runtime-mqtt-ca
+```
+
+Validate before installing:
+
+```bash
+helm lint charts/edgepulse-runtime
+helm template edgepulse-runtime charts/edgepulse-runtime \
+  -f secure-values.yaml > /tmp/edgepulse-secure.yaml
+```
+
+The chart does not issue certificates or generate production passwords. Use cert-manager, External Secrets, another cluster-standard mechanism, or development Secrets prepared before Helm installation.
+
+See `charts/edgepulse-runtime/README.md` for the complete secure values interface.
+
+## Optional ServiceMonitor
+
+If Prometheus Operator is installed:
+
+```bash
+helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
+  --namespace edgepulse \
+  --create-namespace \
+  --set serviceMonitor.enabled=true
+```
+
+See `docs/servicemonitor.md`.
+
+## Uninstall
 
 ```bash
 helm uninstall edgepulse-runtime -n edgepulse
 kubectl delete namespace edgepulse
 ```
 
-## Delete the k3d cluster
+## Delete the cluster
 
 ```bash
 k3d cluster delete edgepulse

@@ -1,133 +1,114 @@
 # EdgePulse AI Runtime
 
-EdgePulse AI Runtime is a lightweight edge-AI runtime for industrial and IoT environments.
+EdgePulse AI Runtime is a compact, production-shaped edge-AI inference platform for industrial and IoT workloads.
 
-It ingests telemetry from simulated edge devices over HTTP or MQTT, runs local anomaly/inference logic, exposes Prometheus-compatible metrics, and can be deployed locally with Docker Compose or on Kubernetes with Helm.
+It accepts device telemetry over HTTP or MQTT, runs local anomaly inference through a rule-based or ONNX Runtime backend, exposes operational metrics, and can be exercised locally with Docker Compose or deployed to Kubernetes with Helm.
 
-The project focuses on the platform layer around edge AI:
+The project is intentionally focused on **AI infrastructure and runtime operations**, not model research.
 
-- telemetry ingestion;
-- containerized runtime packaging;
-- local inference/anomaly detection;
-- HTTP and MQTT ingestion paths;
-- selectable inference backends;
-- ONNX Runtime inference support;
-- health and readiness endpoints;
-- Prometheus-compatible metrics;
-- Grafana dashboarding;
-- Docker Compose deployment;
+## What EdgePulse demonstrates
+
+EdgePulse connects the layers that typically surround an edge inference workload:
+
+```text
+Simulated edge devices
+        |
+        +---- HTTP -----------------------------+
+        |                                       |
+        +---- MQTT / MQTTS ---> Mosquitto ------+
+                                                |
+                                                v
+                                      EdgePulse AI Runtime
+                                      - FastAPI API
+                                      - MQTT consumer
+                                      - configuration validation
+                                      - rule-based / ONNX inference
+                                      - readiness / liveness
+                                      - Prometheus metrics
+                                                |
+                                                v
+                                      Prometheus / Grafana
+```
+
+The repository demonstrates:
+
+- HTTP and MQTT telemetry ingestion;
+- local rule-based and ONNX Runtime inference;
+- validated runtime configuration;
+- health and dependency-aware readiness checks;
+- resilient MQTT reconnect behavior;
+- MQTT username/password authentication and TLS support;
+- optional MQTT client certificates for mTLS-capable brokers;
+- Prometheus-compatible metrics and a Grafana dashboard;
+- Docker Compose integration testing across the real HTTP and MQTT paths;
 - Helm-based Kubernetes deployment;
+- Kubernetes Secret references for MQTT credentials and TLS material;
 - local K3s validation with k3d;
-- CI validation with GitHub Actions.
+- automated tests and coverage;
+- dependency and IaC security checks;
+- container SBOM generation and vulnerability scanning;
+- GHCR image publishing and keyless Cosign signing.
 
-This is not an ML research project. The goal is to show how edge-AI workloads can be packaged, operated, observed, and deployed in a production-shaped way.
-
-## Why this project matters
-
-Most edge-AI examples focus only on model inference. This project focuses on the operational layer around edge AI: packaging, deployment, telemetry ingestion, observability, runtime health checks, CI validation, and Kubernetes delivery.
-
-The goal is to demonstrate production-shaped edge-AI infrastructure rather than only ML model development.
 ## Current version
 
-`v0.9.0` includes:
+Current project and chart version: **`0.9.0`**.
 
-- FastAPI runtime;
-- HTTP `/infer` endpoint;
-- MQTT telemetry consumer;
-- Mosquitto broker through Docker Compose and Helm;
-- rule-based anomaly detector;
-- ONNX Runtime anomaly-scoring backend;
-- selectable backend through `MODEL_BACKEND`;
-- generated ONNX model artifact;
-- simulated vibration, temperature, power-meter, and camera-like devices;
-- Prometheus-compatible metrics;
-- ingestion labels for `http` and `mqtt`;
-- model backend labels for `rule-based` and `onnx`;
-- Docker Compose deployment;
-- Helm chart for Kubernetes deployment;
-- local K3s/k3d deployment documentation;
-- GitHub Actions CI for pre-commit, Python checks, Helm rendering, and Docker image build;
-- Grafana dashboard and Prometheus query examples;
-- GHCR image publishing, SBOM workflow, vulnerability scan, and Cosign image signing.
-
-## Architecture
+The Helm chart metadata and published runtime image use the same application version:
 
 ```text
-                 +-----------------------------+
-                 | Simulated Edge Devices      |
-                 |-----------------------------|
-                 | vibration_sensor            |
-                 | temperature_sensor          |
-                 | power_meter                 |
-                 | camera_device               |
-                 +--------------+--------------+
-                                |
-                    HTTP / MQTT |
-                                v
-+-------------------+      +-----------------------------+
-| Mosquitto MQTT    | ---> | EdgePulse AI Runtime        |
-| Broker            |      |-----------------------------|
-| edge/devices/...  |      | FastAPI                     |
-+-------------------+      | MQTT consumer               |
-                           | rule-based / ONNX inference |
-                           | Prometheus metrics          |
-                           +--------------+--------------+
-                                          |
-                                          v
-                           Grafana / Prometheus observability
+ghcr.io/imanlotfimahyari/edgepulse-runtime:0.9.0
 ```
 
-## Project documentation
+## Runtime endpoints
 
-Useful project guides:
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /healthz` | Liveness: confirms that the process is running. |
+| `GET /readyz` | Readiness: confirms that the runtime can serve inference; when MQTT is enabled, MQTT connectivity is also required. |
+| `GET /model/info` | Returns model and backend metadata. |
+| `POST /infer` | Runs inference for HTTP telemetry. |
+| `GET /metrics` | Exposes Prometheus-compatible runtime metrics. |
 
-```text
-docs/demo-walkthrough.md
-docs/project-roadmap.md
-docs/architecture.md
-docs/observability.md
-docs/model-versioning.md
-docs/security.md
-docs/container-security.md
-docs/release.md
-docs/image-signing.md
-```
+## Inference backends
 
-## Repository structure
+| Backend | Purpose |
+| --- | --- |
+| `rule-based` | Lightweight deterministic anomaly scoring for runtime/platform testing. |
+| `onnx` | ONNX Runtime inference using the packaged anomaly-scoring model. |
 
-```text
-.
-├── charts/
-│   └── edgepulse-runtime/        # Helm chart
-├── dashboards/
-│   └── grafana/                  # Grafana dashboard JSON
-├── deploy/
-│   └── docker-compose/           # Local Docker Compose stack
-├── docs/
-│   ├── architecture.md           # Runtime architecture notes
-│   ├── k3d-k3s-local.md          # Local K3s deployment guide
-│   ├── observability.md          # Metrics, PromQL, and Grafana docs
-│   └── troubleshooting.md        # Local troubleshooting notes
-├── runtime/                      # FastAPI runtime
-├── scripts/                      # Utility scripts, including ONNX model generation
-└── simulators/                   # HTTP/MQTT simulated edge devices
-```
-
-## Run locally with Docker Compose
-
-Start the runtime and MQTT broker:
+Select the backend with:
 
 ```bash
-docker compose -f deploy/docker-compose/docker-compose.yaml up --build
+MODEL_BACKEND=rule-based
+# or
+MODEL_BACKEND=onnx
 ```
 
-Start with ONNX backend:
+When ONNX mode is selected, the runtime loads the configured model during application startup. A model initialization failure makes `/readyz` report not ready.
+
+## Quick start: secured Docker Compose stack
+
+The Compose environment uses an authenticated TLS-enabled Mosquitto broker. Test PKI material and the local password database are generated into an ephemeral Docker volume; private keys are not committed to the repository.
+
+Clean any previous local stack and security volume:
 
 ```bash
-MODEL_BACKEND=onnx docker compose -f deploy/docker-compose/docker-compose.yaml up --build
+docker compose \
+  -f deploy/docker-compose/docker-compose.yaml \
+  --profile e2e \
+  down -v --remove-orphans
 ```
 
-In another terminal, test the runtime:
+Start the broker and runtime:
+
+```bash
+docker compose \
+  -f deploy/docker-compose/docker-compose.yaml \
+  --profile e2e \
+  up -d --build mqtt edgepulse-runtime
+```
+
+Check the runtime:
 
 ```bash
 curl -s http://localhost:8080/healthz | jq
@@ -136,315 +117,193 @@ curl -s http://localhost:8080/model/info | jq
 curl -s http://localhost:8080/metrics | grep edgepulse
 ```
 
-Stop the stack:
+Run the end-to-end test as a one-off Compose service:
 
 ```bash
-docker compose -f deploy/docker-compose/docker-compose.yaml down
+docker compose \
+  -f deploy/docker-compose/docker-compose.yaml \
+  --profile e2e \
+  run --rm --no-deps --build e2e
 ```
 
-## Runtime endpoints
+Expected final output:
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /healthz` | Runtime health check |
-| `GET /readyz` | Runtime readiness and MQTT status |
-| `GET /model/info` | Current model metadata |
-| `POST /infer` | HTTP telemetry inference/anomaly endpoint |
-| `GET /metrics` | Prometheus-compatible metrics |
+```text
+EdgePulse Compose E2E test passed
+```
 
-## Inference backends
+The E2E test validates the assembled system rather than isolated functions:
 
-The runtime supports two backends:
+```text
+E2E service
+   |
+   +--> HTTP --> EdgePulse Runtime --> inference --> metrics
+   |
+   +--> MQTTS + auth --> Mosquitto --> Runtime MQTT consumer
+                                      --> inference --> metrics
+```
 
-| Backend | Description |
-|---|---|
-| `rule-based` | Lightweight score based on mean absolute feature value |
-| `onnx` | ONNX Runtime backend using the generated anomaly-scoring model |
-
-Select the backend with:
+Stop and remove the local stack when finished:
 
 ```bash
-MODEL_BACKEND=rule-based
-MODEL_BACKEND=onnx
+docker compose \
+  -f deploy/docker-compose/docker-compose.yaml \
+  --profile e2e \
+  down -v --remove-orphans
 ```
 
-The ONNX model path is configured with:
+## HTTP simulator example
 
-```bash
-MODEL_PATH=/app/models/anomaly_score.onnx
-```
-
-## Run simulated devices over HTTP
-
-Run the vibration sensor:
+With the runtime available on `localhost:8080`:
 
 ```bash
 python3 -m simulators.vibration_sensor.simulate \
   --mode http \
   --endpoint http://localhost:8080/infer \
-  --interval-seconds 1 \
   --count 5 \
+  --interval-seconds 1 \
   --anomaly-rate 0.30
 ```
 
-Run the temperature sensor:
+The repository also contains temperature, power-meter, and camera-like simulators.
 
-```bash
-python3 -m simulators.temperature_sensor.simulate \
-  --mode http \
-  --endpoint http://localhost:8080/infer \
-  --interval-seconds 1 \
-  --count 5 \
-  --anomaly-rate 0.30
-```
-
-Run the power meter:
-
-```bash
-python3 -m simulators.power_meter.simulate \
-  --mode http \
-  --endpoint http://localhost:8080/infer \
-  --interval-seconds 1 \
-  --count 5 \
-  --anomaly-rate 0.30
-```
-
-Run the camera-like device:
-
-```bash
-python3 -m simulators.camera_device.simulate \
-  --mode http \
-  --endpoint http://localhost:8080/infer \
-  --interval-seconds 1 \
-  --count 5 \
-  --anomaly-rate 0.30
-```
-
-## Run simulated devices over MQTT
-
-Make sure Docker Compose is running first.
-
-Run the vibration sensor:
-
-```bash
-python3 -m simulators.vibration_sensor.simulate \
-  --mode mqtt \
-  --mqtt-host 127.0.0.1 \
-  --mqtt-port 1883 \
-  --interval-seconds 1 \
-  --count 5 \
-  --anomaly-rate 0.30
-```
-
-Run the temperature sensor:
-
-```bash
-python3 -m simulators.temperature_sensor.simulate \
-  --mode mqtt \
-  --mqtt-host 127.0.0.1 \
-  --mqtt-port 1883 \
-  --interval-seconds 1 \
-  --count 5 \
-  --anomaly-rate 0.30
-```
-
-Run the power meter:
-
-```bash
-python3 -m simulators.power_meter.simulate \
-  --mode mqtt \
-  --mqtt-host 127.0.0.1 \
-  --mqtt-port 1883 \
-  --interval-seconds 1 \
-  --count 5 \
-  --anomaly-rate 0.30
-```
-
-Run the camera-like device:
-
-```bash
-python3 -m simulators.camera_device.simulate \
-  --mode mqtt \
-  --mqtt-host 127.0.0.1 \
-  --mqtt-port 1883 \
-  --interval-seconds 1 \
-  --count 5 \
-  --anomaly-rate 0.30
-```
-
-## Check metrics
-
-Check MQTT messages:
-
-```bash
-curl -s http://localhost:8080/metrics | grep edgepulse_mqtt_messages_total
-```
-
-Check ingestion-specific inference metrics:
-
-```bash
-curl -s http://localhost:8080/metrics | grep 'ingestion="mqtt"'
-curl -s http://localhost:8080/metrics | grep 'ingestion="http"'
-```
-
-Check backend-specific inference metrics:
-
-```bash
-curl -s http://localhost:8080/metrics | grep 'model_backend="onnx"'
-curl -s http://localhost:8080/metrics | grep 'model_backend="rule-based"'
-```
-
-Check device messages:
-
-```bash
-curl -s http://localhost:8080/metrics | grep edgepulse_device_messages_total
-```
-
-## Run on local K3s with k3d
-
-See:
-
-```text
-docs/k3d-k3s-local.md
-```
-
-Short version:
-
-```bash
-k3d cluster create edgepulse \
-  --servers 1 \
-  --agents 1
-
-helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
-  --namespace edgepulse \
-  --create-namespace
-```
-
-The default Helm values use the published runtime image:
-
-```text
-ghcr.io/imanlotfimahyari/edgepulse-runtime:0.9.0
-```
-
-Check:
-
-```bash
-kubectl -n edgepulse get pods -o wide
-```
-
-Expected:
-
-```text
-edgepulse-runtime-...        1/1 Running
-edgepulse-runtime-mqtt-...   1/1 Running
-```
+The current generic simulator CLI is most convenient for HTTP and plaintext MQTT development. The secured Compose MQTT path is validated through the dedicated E2E service, which injects its TLS trust and test credentials through environment variables.
 
 ## Observability
 
-EdgePulse exposes Prometheus-compatible metrics through:
+Useful metrics include:
 
 ```text
-GET /metrics
+edgepulse_device_messages_total
+edgepulse_inference_requests_total
+edgepulse_inference_latency_seconds
+edgepulse_inference_errors_total
+edgepulse_mqtt_connected
+edgepulse_mqtt_messages_total
+edgepulse_mqtt_errors_total
+edgepulse_model_info
 ```
 
-Observability documentation and Prometheus query examples are available in:
+Example checks:
 
-```text
-docs/observability.md
+```bash
+curl -s http://localhost:8080/metrics | grep edgepulse_mqtt_connected
+curl -s http://localhost:8080/metrics | grep 'ingestion="mqtt"'
+curl -s http://localhost:8080/metrics | grep 'ingestion="http"'
+curl -s http://localhost:8080/metrics | grep 'model_backend="onnx"'
 ```
 
-A ready-to-import Grafana dashboard is available in:
+A Grafana dashboard is available at:
 
 ```text
 dashboards/grafana/edgepulse-overview.json
 ```
 
-Optional Prometheus Operator `ServiceMonitor` support is documented in:
+See [docs/observability.md](docs/observability.md) for PromQL examples and [docs/servicemonitor.md](docs/servicemonitor.md) for Prometheus Operator integration.
+
+## Kubernetes and Helm
+
+The Helm chart is located at:
 
 ```text
-docs/servicemonitor.md
+charts/edgepulse-runtime
 ```
 
-## Release image
-
-Runtime image publishing is documented in:
-
-```text
-docs/release.md
-```
-
-Image signing is documented in:
-
-```text
-docs/image-signing.md
-```
-
-Published runtime images use GitHub Container Registry:
-
-```text
-ghcr.io/imanlotfimahyari/edgepulse-runtime
-```
-
-## Security
-
-Security notes and audit configuration are documented in:
-
-```text
-docs/security.md
-```
-
-Container SBOM generation and vulnerability scanning are documented in:
-
-```text
-docs/container-security.md
-```
-
-## CI
-
-GitHub Actions validates:
-
-- pre-commit checks;
-- Python syntax/import checks;
-- Ruff lint;
-- Ruff format check;
-- Helm lint;
-- Helm template rendering;
-- Docker image build;
-
-## MQTT development note for WSL
-
-When testing MQTT from WSL with Docker Compose or port-forwarding, make sure there is no local Mosquitto service already listening on port `1883`.
-
-Check:
+Validate it with:
 
 ```bash
-sudo ss -ltnp | grep ':1883' || true
+helm lint charts/edgepulse-runtime
+helm template edgepulse-runtime charts/edgepulse-runtime > /tmp/edgepulse-rendered.yaml
 ```
 
-If a local Mosquitto service is running, stop it before using the Docker Compose broker or Kubernetes port-forward:
+Install the default chart:
 
 ```bash
-sudo systemctl stop mosquitto || true
-sudo pkill mosquitto || true
+helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
+  --namespace edgepulse \
+  --create-namespace
 ```
 
-The simulators use `127.0.0.1` as the MQTT host to avoid `localhost` ambiguity in WSL/Docker Desktop environments.
+The chart can deploy the bundled Mosquitto broker and supports secure MQTT configuration through **existing Kubernetes Secrets**. It does not generate production credentials or certificates.
+
+This allows the operational ownership to remain clean:
+
+```text
+cert-manager / external PKI  ---> TLS Secret --------+
+External Secrets / operator  ---> credential Secret -+--> Helm-mounted configuration
+                                                     |
+                                                     +--> EdgePulse runtime
+                                                     +--> Mosquitto
+```
+
+See [charts/edgepulse-runtime/README.md](charts/edgepulse-runtime/README.md) for values and secure MQTT examples, and [docs/k3d-k3s-local.md](docs/k3d-k3s-local.md) for local Kubernetes validation.
+
+## CI and security validation
+
+The repository uses GitHub Actions to validate:
+
+- pre-commit hooks;
+- Python compilation;
+- Ruff lint and formatting;
+- pytest runtime tests with coverage;
+- Helm lint and template rendering;
+- Docker image builds;
+- Python dependency audits;
+- Checkov Helm/Dockerfile scanning;
+- secured Docker Compose E2E validation.
+
+Separate workflows provide:
+
+- SPDX SBOM generation;
+- container vulnerability scanning;
+- GHCR image publishing;
+- keyless Cosign image signing.
+
+See:
+
+- [docs/security.md](docs/security.md)
+- [docs/container-security.md](docs/container-security.md)
+- [docs/release.md](docs/release.md)
+- [docs/image-signing.md](docs/image-signing.md)
+
+## Repository structure
+
+```text
+.
+├── charts/
+│   └── edgepulse-runtime/        # Helm chart and deployment values
+├── dashboards/
+│   └── grafana/                  # Importable Grafana dashboard
+├── deploy/
+│   └── docker-compose/           # Secured local integration environment
+├── docs/                         # Architecture, operations, security, release guides
+├── runtime/                      # FastAPI runtime, inference backends, tests
+├── scripts/                      # Model utilities and Compose E2E runner
+└── simulators/                   # Simulated edge-device producers
+```
+
+## Documentation map
+
+| Document | Use it for |
+| --- | --- |
+| [Architecture](docs/architecture.md) | Components, data paths, readiness, security boundaries. |
+| [Demo walkthrough](docs/demo-walkthrough.md) | A concise technical demonstration of the project. |
+| [Local k3d/K3s](docs/k3d-k3s-local.md) | Kubernetes validation on a workstation. |
+| [Observability](docs/observability.md) | Metrics, PromQL, Grafana, MQTT connectivity. |
+| [ServiceMonitor](docs/servicemonitor.md) | Prometheus Operator integration. |
+| [Security](docs/security.md) | Runtime, MQTT, Kubernetes, and CI security posture. |
+| [Container security](docs/container-security.md) | SBOM and vulnerability scan workflow. |
+| [Release](docs/release.md) | Version-tagged GHCR publication workflow. |
+| [Image signing](docs/image-signing.md) | Keyless Cosign signing and verification. |
+| [Troubleshooting](docs/troubleshooting.md) | Runtime, MQTT, TLS, Compose, and Kubernetes diagnostics. |
+| [Roadmap](docs/project-roadmap.md) | Current state and next production-oriented increments. |
+
+## Scope
+
+EdgePulse is deliberately small enough to understand end to end. Its purpose is to demonstrate the operational path of an AI workload—from telemetry ingestion through inference, deployment, observability, security, and release—without hiding the core concepts behind a large framework.
+
+It is not intended to be a complete device-management platform, training platform, or production MQTT PKI system.
 
 ## License
 
-This project is licensed under the Apache License 2.0.
-
-See the `LICENSE` file for details.
-
-## Roadmap
-
-Planned production-oriented improvements:
-
-- Add MQTT authentication and TLS.
-- Add device identity and per-device authorization.
-- Add end-to-end Docker Compose tests in CI.
-- Add GitOps deployment examples.
-- Add model registry integration.
-- Add signed model artifact support.
-- Add OpenTelemetry tracing.
-- Add Prometheus alerting examples.
+Apache License 2.0. See [LICENSE](LICENSE).

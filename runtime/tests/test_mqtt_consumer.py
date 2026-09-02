@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from app import mqtt_consumer
+from pydantic import SecretStr
 
 
 def test_valid_mqtt_message_is_processed(monkeypatch) -> None:
@@ -249,3 +250,90 @@ def test_mqtt_consumer_configures_async_reconnect(monkeypatch) -> None:
         60,
     )
     assert calls["retry_first_connection"] is True
+
+
+def test_configure_mqtt_username_password(monkeypatch) -> None:
+    calls = {}
+
+    class FakeClient:
+        def username_pw_set(self, username, password=None) -> None:
+            calls["auth"] = (username, password)
+
+    monkeypatch.setattr(
+        mqtt_consumer.settings,
+        "mqtt_username",
+        "edgepulse-runtime",
+    )
+    monkeypatch.setattr(
+        mqtt_consumer.settings,
+        "mqtt_password",
+        SecretStr("test-password"),
+    )
+    monkeypatch.setattr(
+        mqtt_consumer.settings,
+        "mqtt_tls_enabled",
+        False,
+    )
+
+    mqtt_consumer._configure_mqtt_security(FakeClient())
+
+    assert calls["auth"] == (
+        "edgepulse-runtime",
+        "test-password",
+    )
+
+
+def test_configure_mqtt_tls(monkeypatch) -> None:
+    calls = {}
+
+    class FakeClient:
+        def tls_set(
+            self,
+            ca_certs=None,
+            certfile=None,
+            keyfile=None,
+        ) -> None:
+            calls["tls"] = (
+                ca_certs,
+                certfile,
+                keyfile,
+            )
+
+    monkeypatch.setattr(
+        mqtt_consumer.settings,
+        "mqtt_username",
+        None,
+    )
+    monkeypatch.setattr(
+        mqtt_consumer.settings,
+        "mqtt_password",
+        None,
+    )
+    monkeypatch.setattr(
+        mqtt_consumer.settings,
+        "mqtt_tls_enabled",
+        True,
+    )
+    monkeypatch.setattr(
+        mqtt_consumer.settings,
+        "mqtt_tls_ca_file",
+        "/certs/ca.crt",
+    )
+    monkeypatch.setattr(
+        mqtt_consumer.settings,
+        "mqtt_tls_cert_file",
+        "/certs/client.crt",
+    )
+    monkeypatch.setattr(
+        mqtt_consumer.settings,
+        "mqtt_tls_key_file",
+        "/certs/client.key",
+    )
+
+    mqtt_consumer._configure_mqtt_security(FakeClient())
+
+    assert calls["tls"] == (
+        "/certs/ca.crt",
+        "/certs/client.crt",
+        "/certs/client.key",
+    )

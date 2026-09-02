@@ -24,6 +24,23 @@ runtime:
     mqttEnabled: "true"
     mqttTopic: edge/devices/+/telemetry
 
+  mqtt:
+    auth:
+      enabled: false
+      existingSecret: ""
+      usernameKey: username
+      passwordKey: password
+
+    tls:
+      enabled: false
+      existingSecret: ""
+      caKey: ca.crt
+
+      clientCertificate:
+        enabled: false
+        certKey: tls.crt
+        keyKey: tls.key
+
   securityContext:
     runAsUser: 10001
     runAsGroup: 10001
@@ -70,6 +87,16 @@ mqtt:
       cpu: 100m
       memory: 128Mi
 
+  auth:
+    enabled: false
+    existingSecret: ""
+    passwordFileKey: passwords
+
+  tls:
+    enabled: false
+    existingSecret: ""
+    certKey: tls.crt
+    keyKey: tls.key
 
 serviceAccount:
   create: true
@@ -90,7 +117,6 @@ serviceMonitor:
   annotations: {}
   metricRelabelings: []
   relabelings: []
-
 
 networkPolicy:
   enabled: true
