@@ -4,7 +4,6 @@ from functools import lru_cache
 
 import numpy as np
 import onnxruntime as ort
-
 from app.config import settings
 
 

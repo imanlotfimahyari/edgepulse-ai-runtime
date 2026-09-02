@@ -5,7 +5,6 @@ import logging
 import threading
 
 import paho.mqtt.client as mqtt
-
 from app.config import settings
 from app.metrics import MQTT_ERRORS, MQTT_MESSAGES
 from app.schemas import InferenceRequest

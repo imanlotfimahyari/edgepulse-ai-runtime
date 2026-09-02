@@ -3,15 +3,14 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import FastAPI, Response
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-
 from app.config import settings
 from app.metrics import MODEL_INFO
 from app.model_manifest import load_model_manifest
 from app.mqtt_consumer import start_mqtt_consumer
 from app.schemas import InferenceRequest, InferenceResponse
 from app.service import process_inference_request
+from fastapi import FastAPI, Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 logging.basicConfig(level=logging.INFO)
 

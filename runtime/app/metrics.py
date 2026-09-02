@@ -1,6 +1,5 @@
 from prometheus_client import Counter, Gauge, Histogram
 
-
 INFERENCE_REQUESTS = Counter(
     "edgepulse_inference_requests_total",
     "Total number of inference requests.",

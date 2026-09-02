@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import random
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def utc_timestamp() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def is_anomaly_event(anomaly_rate: float) -> bool:
