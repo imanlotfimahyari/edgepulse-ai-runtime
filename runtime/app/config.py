@@ -1,27 +1,28 @@
-import os
+from typing import Literal
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-def env_bool(name: str, default: bool = False) -> bool:
-    value = os.getenv(name)
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
-    if value is None:
-        return default
+    service_name: str = "edgepulse-ai-runtime"
 
-    return value.lower() in {"1", "true", "yes", "on"}
+    model_name: str = "edgepulse-anomaly-detector"
+    model_version: str = "0.9.0"
+    model_backend: Literal["rule-based", "onnx"] = "rule-based"
+    model_path: str = "/app/models/anomaly_score.onnx"
+    anomaly_threshold: float = Field(default=0.65, ge=0.0, le=1.0)
 
-
-class Settings:
-    service_name: str = os.getenv("SERVICE_NAME", "edgepulse-ai-runtime")
-    model_name: str = os.getenv("MODEL_NAME", "edgepulse-anomaly-detector")
-    model_version: str = os.getenv("MODEL_VERSION", "0.9.0")
-    model_backend: str = os.getenv("MODEL_BACKEND", "rule-based")
-    model_path: str = os.getenv("MODEL_PATH", "/app/models/anomaly_score.onnx")
-    anomaly_threshold: float = float(os.getenv("ANOMALY_THRESHOLD", "0.65"))
-
-    mqtt_enabled: bool = env_bool("MQTT_ENABLED", False)
-    mqtt_host: str = os.getenv("MQTT_HOST", "localhost")
-    mqtt_port: int = int(os.getenv("MQTT_PORT", "1883"))
-    mqtt_topic: str = os.getenv("MQTT_TOPIC", "edge/devices/+/telemetry")
+    mqtt_enabled: bool = False
+    mqtt_host: str = "localhost"
+    mqtt_port: int = Field(default=1883, ge=1, le=65535)
+    mqtt_topic: str = "edge/devices/+/telemetry"
 
 
 settings = Settings()
