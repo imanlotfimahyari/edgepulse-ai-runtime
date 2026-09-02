@@ -27,7 +27,7 @@ ENV PIPX_HOME=/opt/pipx
 ENV PIPX_BIN_DIR=/usr/local/bin
 
 RUN pipx install pre-commit \
-  && pipx install ruff \
+  && pipx install ruff==0.16.5 \
   && pipx install black \
   && pipx install checkov \
   && pipx install detect-secrets

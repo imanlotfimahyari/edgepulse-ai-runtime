@@ -3,9 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 
 import pytest
-from pydantic import ValidationError
-
 from app.schemas import InferenceRequest
+from pydantic import ValidationError
 
 
 def test_valid_inference_request() -> None:
