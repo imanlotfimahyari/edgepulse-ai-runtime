@@ -1,0 +1,9 @@
+FROM eclipse-mosquitto:2
+
+USER root
+
+RUN apk add --no-cache openssl
+
+COPY generate-mqtt-security.sh /usr/local/bin/generate-mqtt-security.sh
+
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/generate-mqtt-security.sh"]

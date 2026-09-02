@@ -50,6 +50,17 @@ spec:
               mountPath: /mosquitto/data
             - name: mqtt-log
               mountPath: /mosquitto/log
+            {{- if .Values.mqtt.auth.enabled }}
+            - name: mqtt-auth
+              mountPath: /mosquitto/security/passwords
+              subPath: passwords
+              readOnly: true
+            {{- end }}
+            {{- if .Values.mqtt.tls.enabled }}
+            - name: mqtt-tls
+              mountPath: /mosquitto/tls
+              readOnly: true
+            {{- end }}
           resources:
             {{- toYaml .Values.mqtt.resources | nindent 12 }}
       volumes:
@@ -60,4 +71,22 @@ spec:
           emptyDir: {}
         - name: mqtt-log
           emptyDir: {}
+        {{- if .Values.mqtt.auth.enabled }}
+        - name: mqtt-auth
+          secret:
+            secretName: {{ required "mqtt.auth.existingSecret is required when MQTT authentication is enabled" .Values.mqtt.auth.existingSecret }}
+            items:
+              - key: {{ .Values.mqtt.auth.passwordFileKey }}
+                path: passwords
+        {{- end }}
+        {{- if .Values.mqtt.tls.enabled }}
+        - name: mqtt-tls
+          secret:
+            secretName: {{ required "mqtt.tls.existingSecret is required when MQTT TLS is enabled" .Values.mqtt.tls.existingSecret }}
+            items:
+              - key: {{ .Values.mqtt.tls.certKey }}
+                path: tls.crt
+              - key: {{ .Values.mqtt.tls.keyKey }}
+                path: tls.key
+        {{- end }}
 {{- end }}

@@ -1,77 +1,93 @@
 # Container Security
 
-EdgePulse includes a container security workflow that builds the runtime image, generates an SBOM, and scans the image for known vulnerabilities.
+EdgePulse has a dedicated container-security workflow that builds the runtime image, generates an SBOM, and scans the image for known vulnerabilities.
 
-## Workflow
+Workflow:
 
 ```text
 .github/workflows/container-security.yaml
 ```
 
-## What it does
-
-The workflow:
-
-1. Builds the runtime container image from `runtime/Dockerfile`.
-2. Generates an SPDX JSON SBOM.
-3. Uploads the SBOM as a GitHub Actions artifact.
-4. Scans the image for known vulnerabilities.
-5. Uploads vulnerability results as a SARIF workflow artifact.
-
-## Image scanned
-
-The workflow builds and scans a local CI image:
+## Pipeline
 
 ```text
+runtime/Dockerfile
+      |
+      v
+local CI image
 edgepulse-runtime:security-scan
+      |
+      +--> SPDX JSON SBOM
+      |
+      +--> vulnerability scan
+              |
+              v
+           SARIF artifact
 ```
 
-This avoids requiring GHCR credentials during pull-request validation.
+The workflow deliberately scans a locally built image so pull-request validation does not depend on GHCR authentication or a previously published release.
 
 ## SBOM
 
-The generated SBOM artifact is:
+The workflow uses Anchore's SBOM action and emits SPDX JSON:
 
 ```text
 edgepulse-runtime.spdx.json
 ```
 
-## Vulnerability scan mode
+It is uploaded as the GitHub Actions artifact:
 
-The vulnerability scan is currently configured as visibility-first:
-
-```yaml
-fail-build: false
-severity-cutoff: high
+```text
+edgepulse-runtime-sbom
 ```
 
-This means findings are reported but do not block the build yet.
+The SBOM provides a machine-readable inventory of image packages and dependencies that can be retained with CI evidence or consumed by later supply-chain tooling.
 
-After baseline findings are reviewed, this can be tightened to:
+## Vulnerability scan
 
-```yaml
-fail-build: true
-severity-cutoff: critical
+The runtime image is scanned with Anchore's scan action.
+
+Current policy:
+
+```text
+severity cutoff: high
+fail build: false
+output: SARIF
 ```
 
-## Related checks
+This is currently **visibility-first**: high-severity findings are reported but do not block the workflow.
 
-This complements the existing security checks:
-
-- `pip-audit` for Python dependencies;
-- `checkov` for Helm and Dockerfile checks;
-- pre-commit validation;
-- Docker image build validation.
-
-
-## SARIF artifact
-
-The vulnerability scan produces a SARIF artifact:
+The SARIF result is uploaded as:
 
 ```text
 edgepulse-runtime-vulnerability-sarif
 ```
 
-The SARIF file is uploaded as a workflow artifact instead of being uploaded to GitHub Code Scanning.
+The artifact is retained as workflow evidence instead of being uploaded to GitHub Code Scanning, which keeps the workflow usable in repositories or plans where Code Scanning upload is unavailable.
 
-This keeps the workflow compatible with private repositories that may not have Code Scanning upload permissions or GitHub Advanced Security enabled.
+## Related security checks
+
+Container scanning complements, rather than replaces, the other repository controls:
+
+| Layer | Check |
+| --- | --- |
+| Python dependencies | `pip-audit` |
+| Helm / Dockerfile IaC | Checkov |
+| Source hygiene | pre-commit hooks |
+| Private-key leakage | pre-commit private-key detection |
+| Runtime image | Anchore vulnerability scan |
+| Software inventory | SPDX SBOM |
+| Release provenance | keyless Cosign signing |
+
+See `docs/security.md` for the complete security posture and `docs/image-signing.md` for release image verification.
+
+## Future tightening
+
+A reasonable future progression is:
+
+1. establish a reviewed vulnerability baseline;
+2. document accepted exceptions with expiry/owner information;
+3. fail releases on actionable critical findings;
+4. optionally apply stricter blocking policy to `main` after false positives and inherited base-image findings are understood.
+
+Blocking thresholds should be introduced intentionally rather than treating scanner output as equivalent to exploitable risk.

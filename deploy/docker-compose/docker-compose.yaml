@@ -1,11 +1,28 @@
 services:
+  mqtt-security-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.mqtt-security-init
+    environment:
+      MQTT_RUNTIME_USERNAME: edgepulse-runtime
+      MQTT_RUNTIME_PASSWORD: edgepulse-runtime-test-password
+      MQTT_SIMULATOR_USERNAME: edgepulse-simulator
+      MQTT_SIMULATOR_PASSWORD: edgepulse-simulator-test-password
+    volumes:
+      - mqtt-security:/security
+
   mqtt:
     build:
       context: .
       dockerfile: Dockerfile.mosquitto
     container_name: edgepulse-mqtt
     ports:
-      - "1883:1883"
+      - "8883:8883"
+    volumes:
+      - mqtt-security:/mosquitto/security:ro
+    depends_on:
+      mqtt-security-init:
+        condition: service_completed_successfully
 
   edgepulse-runtime:
     build:
@@ -20,12 +37,19 @@ services:
       ANOMALY_THRESHOLD: ${ANOMALY_THRESHOLD:-0.65}
       MQTT_ENABLED: "true"
       MQTT_HOST: mqtt
-      MQTT_PORT: "1883"
+      MQTT_PORT: "8883"
       MQTT_TOPIC: edge/devices/+/telemetry
+      MQTT_USERNAME: edgepulse-runtime
+      MQTT_PASSWORD: edgepulse-runtime-test-password
+      MQTT_TLS_ENABLED: "true"
+      MQTT_TLS_CA_FILE: /mqtt-security/ca.crt
+    volumes:
+      - mqtt-security:/mqtt-security:ro
     ports:
       - "8080:8080"
     depends_on:
-      - mqtt
+      mqtt:
+        condition: service_started
 
   e2e:
     build:
@@ -34,9 +58,17 @@ services:
     environment:
       EDGEPULSE_BASE_URL: http://edgepulse-runtime:8080
       EDGEPULSE_MQTT_HOST: mqtt
-      EDGEPULSE_MQTT_PORT: "1883"
+      EDGEPULSE_MQTT_PORT: "8883"
+      EDGEPULSE_MQTT_USERNAME: edgepulse-simulator
+      EDGEPULSE_MQTT_PASSWORD: edgepulse-simulator-test-password
+      EDGEPULSE_MQTT_TLS_CA_FILE: /mqtt-security/ca.crt
+    volumes:
+      - mqtt-security:/mqtt-security:ro
     depends_on:
       edgepulse-runtime:
         condition: service_healthy
     profiles:
       - e2e
+
+volumes:
+  mqtt-security:

@@ -21,6 +21,23 @@ spec:
       automountServiceAccountToken: false
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.runtime.mqtt.tls.enabled }}
+      volumes:
+        - name: mqtt-client-tls
+          secret:
+            secretName: {{ required "runtime.mqtt.tls.existingSecret is required when MQTT TLS is enabled" .Values.runtime.mqtt.tls.existingSecret }}
+            items:
+              - key: {{ .Values.runtime.mqtt.tls.caKey }}
+                path: ca.crt
+
+              {{- if .Values.runtime.mqtt.tls.clientCertificate.enabled }}
+              - key: {{ .Values.runtime.mqtt.tls.clientCertificate.certKey }}
+                path: tls.crt
+
+              - key: {{ .Values.runtime.mqtt.tls.clientCertificate.keyKey }}
+                path: tls.key
+              {{- end }}
+      {{- end }}
       containers:
         - name: runtime
           image: "{{ .Values.runtime.image.repository }}:{{ .Values.runtime.image.tag }}"
@@ -51,6 +68,30 @@ spec:
               value: {{ .Values.mqtt.service.port | quote }}
             - name: MQTT_TOPIC
               value: {{ .Values.runtime.env.mqttTopic | quote }}
+            {{- if .Values.runtime.mqtt.auth.enabled }}
+            - name: MQTT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "runtime.mqtt.auth.existingSecret is required when MQTT authentication is enabled" .Values.runtime.mqtt.auth.existingSecret }}
+                  key: {{ .Values.runtime.mqtt.auth.usernameKey }}
+            - name: MQTT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.runtime.mqtt.auth.existingSecret }}
+                  key: {{ .Values.runtime.mqtt.auth.passwordKey }}
+            {{- end }}
+            - name: MQTT_TLS_ENABLED
+              value: {{ .Values.runtime.mqtt.tls.enabled | quote }}
+            {{- if .Values.runtime.mqtt.tls.enabled }}
+            - name: MQTT_TLS_CA_FILE
+              value: /etc/edgepulse/mqtt-tls/ca.crt
+            {{- end }}
+            {{- if and .Values.runtime.mqtt.tls.enabled .Values.runtime.mqtt.tls.clientCertificate.enabled }}
+            - name: MQTT_TLS_CERT_FILE
+              value: /etc/edgepulse/mqtt-tls/tls.crt
+            - name: MQTT_TLS_KEY_FILE
+              value: /etc/edgepulse/mqtt-tls/tls.key
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /readyz
@@ -63,5 +104,11 @@ spec:
               port: http
             initialDelaySeconds: 10
             periodSeconds: 20
+          {{- if .Values.runtime.mqtt.tls.enabled }}
+          volumeMounts:
+            - name: mqtt-client-tls
+              mountPath: /etc/edgepulse/mqtt-tls
+              readOnly: true
+          {{- end }}
           resources:
             {{- toYaml .Values.runtime.resources | nindent 12 }}

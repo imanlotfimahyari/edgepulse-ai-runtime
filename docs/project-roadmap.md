@@ -1,141 +1,166 @@
 # Project Roadmap
 
-This document describes possible next steps for EdgePulse AI Runtime.
+EdgePulse is intentionally developed in small, production-oriented increments. The goal is not to build every edge/ML subsystem, but to make the operational path around AI inference increasingly realistic.
 
 ## Current state
 
-EdgePulse currently includes:
+Implemented today:
 
-- simulated edge devices;
+### Runtime and inference
+
+- FastAPI inference runtime;
 - HTTP telemetry ingestion;
 - MQTT telemetry ingestion;
-- local anomaly scoring;
-- ONNX model artifact support;
-- model manifest and checksum verification;
-- Prometheus-compatible metrics;
-- Grafana dashboard;
+- rule-based inference backend;
+- ONNX Runtime backend;
+- backend selection through configuration;
+- model artifact and metadata exposure;
+- startup validation for the configured backend;
+- liveness and dependency-aware readiness.
+
+### MQTT reliability and security
+
+- asynchronous MQTT connection and retry behavior;
+- connection-state tracking;
+- MQTT connectivity metric;
+- readiness failure when MQTT is required but disconnected;
+- username/password authentication support;
+- TLS CA verification;
+- optional client certificate/key support;
+- secured Docker Compose broker/E2E environment;
+- Helm references to existing credential and TLS Secrets.
+
+### Platform and observability
+
 - Docker Compose deployment;
-- Helm chart for Kubernetes;
-- local K3s/k3d validation;
-- ServiceMonitor support;
-- CI checks;
+- end-to-end Compose validation for HTTP + MQTT;
+- Helm chart;
+- local k3d/K3s validation;
+- NetworkPolicy support;
+- optional ServiceMonitor;
+- Prometheus metrics;
+- Grafana dashboard.
+
+### Quality and supply chain
+
+- pytest runtime suite with coverage;
+- Ruff lint/format validation;
+- pre-commit controls;
 - dependency audit;
-- Checkov IaC scanning;
+- Checkov IaC checks;
 - container SBOM generation;
 - vulnerability scan artifact;
-- GHCR image publishing;
-- Cosign image signing.
+- GHCR image release workflow;
+- keyless Cosign signing.
 
-## Near-term improvements
+## Recommended next increments
 
-### 1. MQTT authentication and TLS
+### 1. Device identity and authorization
 
-Current MQTT setup is intentionally simple for local development.
+Today, `device_id` and `device_type` are payload fields rather than managed identities.
 
-Production improvement:
+Next useful step:
 
-- enable username/password authentication;
-- support TLS listener;
-- mount broker credentials from Kubernetes Secret;
-- document local and Kubernetes secure MQTT setup.
+- define a minimal device registry;
+- distinguish registered vs unknown devices;
+- associate identity with tenant/site/location metadata;
+- add authorization policy for publish topics;
+- demonstrate per-device or per-group MQTT ACLs.
 
-### 2. Device identity
+Avoid building a large device-management product; the goal is to demonstrate identity enforcement around the runtime.
 
-Current simulators send a `device_id` and `device_type`, but there is no device registry.
+### 2. Model lifecycle and artifact integrity
 
-Production improvement:
+The ONNX model is currently a compact demo artifact.
 
-- define device identity model;
-- validate known devices;
-- reject unknown device IDs;
-- add per-device metadata;
-- track device source and tenant/location labels.
+Next useful step:
 
-### 3. Realistic model lifecycle
-
-Current ONNX model is a demo artifact.
-
-Production improvement:
-
-- add training pipeline;
-- generate model from sample dataset;
-- store training metadata;
-- track model input schema;
+- formalize model manifest/schema metadata;
+- verify model checksum on startup;
+- track model input/output schema;
 - sign model artifacts;
-- support model registry integration.
+- demonstrate promotion between model versions;
+- optionally integrate a lightweight model registry.
 
-### 4. Runtime backend selection
+The focus should remain inference infrastructure rather than a full training platform.
 
-Current runtime can expose model metadata and has ONNX artifact support.
+### 3. MQTT consumer scaling semantics
 
-Production improvement:
+A single consumer is straightforward; horizontal scaling introduces message-delivery semantics.
 
-- make backend selection clearer;
-- support rule-based and ONNX backends as explicit runtime modes;
-- validate model availability on startup when ONNX mode is selected;
-- fail readiness if configured model backend cannot load.
+Explore:
 
-### 5. End-to-end tests
+- shared subscriptions or consumer-group behavior;
+- duplicate-processing risks;
+- idempotency strategy;
+- malformed-message retry/dead-letter behavior;
+- broker reconnect behavior under multiple replicas.
 
-Production improvement:
+This would add meaningful distributed-systems depth to the project.
 
-- start Docker Compose in CI;
-- run HTTP simulator;
-- run MQTT simulator;
-- assert metrics are produced;
-- assert `/model/info` verifies model checksum.
+### 4. GitOps deployment
 
-### 6. GitOps deployment example
+Add a small Argo CD example when repeated Kubernetes promotion becomes useful:
 
-Production improvement:
+- Argo CD `Application` or ApplicationSet example;
+- environment-specific values;
+- immutable image-tag promotion;
+- drift/reconciliation demonstration.
 
-- add Argo CD Application example;
-- document Helm values for Kubernetes deployment;
-- document image tag promotion flow.
+Do not add GitOps only for a UI; add it to demonstrate declarative promotion and reconciliation.
 
-### 7. Observability improvements
+### 5. Observability and SLOs
 
-Production improvement:
+Extend the current metrics with:
 
-- add alert examples;
-- add PrometheusRule template;
-- add Grafana panels for latency percentiles;
-- add MQTT-specific dashboard panels;
-- add OpenTelemetry tracing.
+- PrometheusRule examples;
+- MQTT disconnection alerts;
+- inference availability/latency SLO examples;
+- error-budget-oriented dashboard panels;
+- OpenTelemetry tracing for HTTP/MQTT to inference.
 
-### 8. Scaling and reliability
+### 6. Edge-to-cloud behavior
 
-Production improvement:
+A later phase could demonstrate real edge concerns:
 
-- define MQTT consumer scaling model;
-- avoid duplicate consumption when replicas increase;
-- add durable queue or shared subscription design;
-- add retry/dead-letter behavior for malformed telemetry.
+- intermittent uplink;
+- local buffering;
+- store-and-forward synchronization;
+- cloud control-plane/model update flow;
+- fleet-level runtime health.
 
-## Longer-term production direction
+This is more valuable than prematurely adding multi-cloud abstractions.
 
-A production-grade version of this project would include:
+## Longer-term direction
 
-- secure MQTT ingestion;
-- device registry;
-- model registry;
-- signed model artifacts;
-- policy-controlled Kubernetes deployment;
-- GitOps promotion;
-- telemetry storage;
-- edge-to-cloud synchronization;
-- offline operation mode;
-- fleet-level observability.
+A mature demonstration could eventually cover:
 
-## What should not be overbuilt yet
+```text
+device identity
+      |
+secure telemetry
+      |
+edge inference runtime
+      |
+local observability + buffering
+      |
+Kubernetes / fleet operations
+      |
+model + configuration promotion
+      |
+edge-to-cloud synchronization
+```
 
-Avoid overbuilding these too early:
+## What not to overbuild
 
-- complex ML training pipeline;
+Avoid adding complexity unless it demonstrates a specific infrastructure concept:
+
 - large frontend UI;
-- multi-cloud abstractions;
-- heavy service mesh integration;
-- distributed database;
-- custom Kubernetes operator.
+- full ML training platform;
+- distributed database without a concrete requirement;
+- multi-cloud abstraction layer;
+- service mesh by default;
+- custom Kubernetes operator before reconciliation logic is genuinely needed;
+- bespoke PKI when cert-manager/external PKI already models the lifecycle well.
 
-The current value of the project is that it stays compact while still showing production-oriented platform thinking.
+The strongest characteristic of EdgePulse is that one engineer can still understand the entire system while it demonstrates realistic platform concerns.

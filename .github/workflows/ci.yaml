@@ -165,14 +165,19 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Start secured Compose stack
+        run: |
+          docker compose \
+            -f deploy/docker-compose/docker-compose.yaml \
+            --profile e2e \
+            up -d --build mqtt edgepulse-runtime
+
       - name: Run Compose E2E test
         run: |
           docker compose \
             -f deploy/docker-compose/docker-compose.yaml \
             --profile e2e \
-            up --build \
-            --abort-on-container-exit \
-            --exit-code-from e2e
+            run --rm --no-deps --build e2e
 
       - name: Show Compose logs
         if: always()

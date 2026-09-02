@@ -1,41 +1,73 @@
-# EdgePulse Demo Script
+# Demo Walkthrough
 
-This document provides a short demo flow for presenting EdgePulse AI Runtime.
+This walkthrough presents EdgePulse as an **edge-AI runtime and platform engineering project**, not merely an inference API.
 
-## Demo goal
+## Demo objective
 
-Show that EdgePulse is not only an inference API. It is a production-shaped edge-AI runtime with:
+In five to ten minutes, show this lifecycle:
 
-- simulated edge devices;
-- HTTP and MQTT ingestion;
-- local inference;
-- Prometheus metrics;
-- Docker Compose deployment;
-- Helm/Kubernetes deployment;
-- CI, security scanning, SBOM generation, image signing, and model artifact versioning.
-
-## 5-minute demo
-
-### 1. Explain the problem
-
-Industrial and IoT environments often need local inference close to edge devices.
-
-Sending every telemetry event to a central cloud system can be expensive, slow, or unreliable when connectivity is limited.
-
-EdgePulse demonstrates how an edge runtime can receive device telemetry, run local anomaly detection, expose metrics, and be packaged for container/Kubernetes environments.
-
-### 2. Start the local stack
-
-```bash
-docker compose -f deploy/docker-compose/docker-compose.yaml up --build
+```text
+device telemetry
+   |
+   +--> HTTP
+   |
+   +--> secured MQTT
+           |
+           v
+     local inference
+           |
+           v
+     operational metrics
+           |
+           v
+ container / Kubernetes packaging
+           |
+           v
+ CI + security + signed release
 ```
 
-This starts:
+## Before the demo
 
-- EdgePulse Runtime;
-- Mosquitto MQTT broker.
+From the repository root, ensure Docker is available:
 
-### 3. Check runtime health
+```bash
+docker version
+```
+
+Reset any previous Compose state:
+
+```bash
+docker compose \
+  -f deploy/docker-compose/docker-compose.yaml \
+  --profile e2e \
+  down -v --remove-orphans
+```
+
+## Five-minute flow
+
+### 1. State the problem
+
+Edge inference often needs to operate close to devices because sending every telemetry event to a central cloud path can add latency, bandwidth cost, dependency on WAN connectivity, and operational complexity.
+
+EdgePulse demonstrates the infrastructure around local inference: ingestion, runtime health, secure messaging, metrics, containers, Kubernetes delivery, and CI/security controls.
+
+### 2. Start the secured local platform
+
+```bash
+docker compose \
+  -f deploy/docker-compose/docker-compose.yaml \
+  --profile e2e \
+  up -d --build mqtt edgepulse-runtime
+```
+
+Explain what just happened:
+
+- an init service generated ephemeral test PKI and a Mosquitto password database;
+- Mosquitto started with TLS and authentication;
+- EdgePulse started and connected using its own MQTT identity;
+- readiness becomes successful only after required runtime initialization and MQTT connectivity are available.
+
+### 3. Show health and model state
 
 ```bash
 curl -s http://localhost:8080/healthz | jq
@@ -43,15 +75,14 @@ curl -s http://localhost:8080/readyz | jq
 curl -s http://localhost:8080/model/info | jq
 ```
 
-Important things to show:
+Explain the distinction:
 
-- runtime is healthy;
-- MQTT is enabled;
-- model metadata is exposed;
-- model manifest is available;
-- model checksum verification succeeds.
+```text
+healthz = process is alive
+readyz  = runtime can serve its configured workload
+```
 
-### 4. Run simulated devices over HTTP
+### 4. Send HTTP telemetry
 
 ```bash
 python3 -m simulators.vibration_sensor.simulate \
@@ -62,99 +93,131 @@ python3 -m simulators.vibration_sensor.simulate \
   --anomaly-rate 0.30
 ```
 
-Explain that this simulates a device calling the runtime directly through HTTP.
+Point out that the simulator is not implementing inference; it is only producing telemetry. The runtime validates and processes the request.
 
-### 5. Run simulated devices over MQTT
+### 5. Prove the secured MQTT path
+
+Run the dedicated Compose E2E service:
 
 ```bash
-python3 -m simulators.temperature_sensor.simulate \
-  --mode mqtt \
-  --mqtt-host 127.0.0.1 \
-  --mqtt-port 1883 \
-  --count 5 \
-  --interval-seconds 1 \
-  --anomaly-rate 0.30
+docker compose \
+  -f deploy/docker-compose/docker-compose.yaml \
+  --profile e2e \
+  run --rm --no-deps --build e2e
 ```
 
-Explain that MQTT is closer to many edge/IoT deployments where devices publish telemetry to topics.
+Expected result:
 
-### 6. Check metrics
+```text
+EdgePulse Compose E2E test passed
+```
+
+Show broker logs:
 
 ```bash
-curl -s http://localhost:8080/metrics | grep edgepulse_device_messages_total
+docker compose \
+  -f deploy/docker-compose/docker-compose.yaml \
+  logs --tail=50 mqtt
+```
+
+Useful lines demonstrate that:
+
+- `edgepulse-runtime` connects with its runtime username;
+- the simulator/E2E client connects with a separate username;
+- the clients negotiate TLS.
+
+Show runtime logs:
+
+```bash
+docker compose \
+  -f deploy/docker-compose/docker-compose.yaml \
+  logs --tail=50 edgepulse-runtime
+```
+
+Look for:
+
+```text
+MQTT connected reason_code=Success
+MQTT inference processed ...
+```
+
+### 6. Show metrics
+
+```bash
+curl -s http://localhost:8080/metrics | grep edgepulse_mqtt_connected
 curl -s http://localhost:8080/metrics | grep edgepulse_inference_requests_total
 curl -s http://localhost:8080/metrics | grep edgepulse_mqtt_messages_total
 ```
 
-Important things to show:
+Explain that the metrics distinguish:
 
-- messages are counted by device type;
-- inference requests are counted by ingestion type;
-- MQTT messages are visible separately;
-- metrics are Prometheus-compatible.
+- HTTP vs MQTT ingestion;
+- rule-based vs ONNX backend;
+- device type;
+- prediction;
+- MQTT topic.
 
-### 7. Explain Kubernetes path
+## Ten-minute extension
 
-Show the Helm chart:
-
-```bash
-tree charts/edgepulse-runtime
-```
-
-Then explain that the same runtime can be deployed with Helm to K3s/k3d or a real Kubernetes cluster.
-
-### 8. Explain release/security path
-
-Show the workflows:
-
-```bash
-ls .github/workflows
-```
-
-Mention:
-
-- CI validation;
-- dependency audit;
-- Checkov IaC checks;
-- container SBOM and vulnerability scan;
-- GHCR image publishing;
-- Cosign image signing.
-
-## 10-minute demo extension
-
-If there is more time, also show:
+### 7. Show the Kubernetes path
 
 ```bash
 helm lint charts/edgepulse-runtime
 helm template edgepulse-runtime charts/edgepulse-runtime > /tmp/edgepulse-rendered.yaml
 ```
 
-Then show:
+Then inspect operational controls:
 
 ```bash
-grep -n "kind: NetworkPolicy\|readinessProbe\|livenessProbe\|ServiceMonitor" /tmp/edgepulse-rendered.yaml
+grep -nE \
+  'readinessProbe|livenessProbe|NetworkPolicy|ServiceMonitor|securityContext' \
+  /tmp/edgepulse-rendered.yaml
 ```
 
-This demonstrates Kubernetes operational maturity:
+Explain that the chart includes non-root execution, resource controls, probes, NetworkPolicy support, and optional ServiceMonitor integration.
 
-- health checks;
-- network policy;
-- service monitor support;
-- resource requests and limits;
-- non-root runtime settings.
+### 8. Show secure Helm wiring
+
+Explain that production credentials are not generated by Helm. The chart references existing Secrets for:
+
+```text
+Mosquitto password database
+Mosquitto TLS certificate/key
+runtime MQTT username/password
+runtime CA trust
+optional runtime client certificate/key
+```
+
+This makes the chart compatible with cert-manager, External Secrets, or another platform-standard secret lifecycle.
+
+### 9. Show CI and supply-chain controls
+
+```bash
+ls .github/workflows
+```
+
+Highlight:
+
+- source and test checks;
+- secured Compose E2E;
+- dependency audit;
+- Checkov IaC scanning;
+- SBOM generation;
+- vulnerability scanning;
+- GHCR publishing;
+- keyless Cosign signing.
 
 ## Closing statement
 
-EdgePulse is a small project, but it demonstrates the full lifecycle of an edge-AI workload:
+A concise positioning statement:
 
-```text
-device telemetry
--> HTTP/MQTT ingestion
--> local inference
--> metrics
--> container packaging
--> Kubernetes deployment
--> CI/security validation
--> signed release image
--> versioned model artifact
+> EdgePulse keeps the model intentionally small and makes the surrounding infrastructure visible: secure telemetry ingestion, inference runtime behavior, readiness, observability, container packaging, Kubernetes delivery, CI, and release provenance.
+
+## Cleanup
+
+```bash
+docker compose \
+  -f deploy/docker-compose/docker-compose.yaml \
+  --profile e2e \
+  down -v --remove-orphans
 ```

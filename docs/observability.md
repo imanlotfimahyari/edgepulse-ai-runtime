@@ -1,38 +1,63 @@
 # Observability
 
-EdgePulse AI Runtime exposes Prometheus-compatible metrics through:
+EdgePulse exposes Prometheus-compatible metrics at:
 
 ```text
 GET /metrics
 ```
 
-The metrics are designed to make the runtime observable by device type, ingestion mode, prediction, and model backend.
+The metrics cover workload behavior, inference performance, and MQTT dependency state.
 
-## Main metrics
+## Metric inventory
 
-| Metric | Purpose |
-|---|---|
-| `edgepulse_device_messages_total` | Count of received device messages |
-| `edgepulse_inference_requests_total` | Count of inference requests by prediction, backend, and ingestion mode |
-| `edgepulse_inference_latency_seconds` | Inference latency histogram |
-| `edgepulse_inference_errors_total` | Inference error count |
-| `edgepulse_mqtt_messages_total` | MQTT message count by topic and device type |
-| `edgepulse_mqtt_errors_total` | MQTT consumer error count |
-| `edgepulse_model_info` | Model metadata exposed as labels |
+| Metric | Type / purpose |
+| --- | --- |
+| `edgepulse_device_messages_total` | Device messages by device type and ingestion path. |
+| `edgepulse_inference_requests_total` | Inference requests by device type, prediction, backend, and ingestion. |
+| `edgepulse_inference_latency_seconds` | Inference latency histogram. |
+| `edgepulse_inference_errors_total` | Inference processing errors. |
+| `edgepulse_mqtt_connected` | Gauge: `1` while the runtime MQTT client is connected, otherwise `0`. |
+| `edgepulse_mqtt_messages_total` | MQTT messages by topic and device type. |
+| `edgepulse_mqtt_errors_total` | MQTT message-processing errors by topic. |
+| `edgepulse_model_info` | Current model metadata represented as labels. |
 
 ## Important labels
 
 | Label | Meaning |
-|---|---|
-| `device_type` | Simulated device type |
-| `ingestion` | `http` or `mqtt` |
-| `prediction` | `normal` or `anomaly` |
-| `model_backend` | `rule-based` or `onnx` |
-| `topic` | MQTT topic |
+| --- | --- |
+| `device_type` | Device/simulator type. |
+| `ingestion` | `http` or `mqtt`. |
+| `prediction` | Inference result, for example `normal` or `anomaly`. |
+| `model_backend` | `rule-based` or `onnx`. |
+| `topic` | MQTT topic. |
 
-## Docker Compose scrape example
+These labels make it possible to compare transport behavior and model behavior without maintaining separate metric families for each path.
 
-When Prometheus runs in the same Docker Compose network, scrape the runtime service name:
+## Quick checks
+
+MQTT connection state:
+
+```bash
+curl -s http://localhost:8080/metrics | grep edgepulse_mqtt_connected
+```
+
+HTTP vs MQTT inference:
+
+```bash
+curl -s http://localhost:8080/metrics | grep 'ingestion="http"'
+curl -s http://localhost:8080/metrics | grep 'ingestion="mqtt"'
+```
+
+Backend-specific metrics:
+
+```bash
+curl -s http://localhost:8080/metrics | grep 'model_backend="rule-based"'
+curl -s http://localhost:8080/metrics | grep 'model_backend="onnx"'
+```
+
+## Prometheus scrape examples
+
+### Same Docker network
 
 ```yaml
 scrape_configs:
@@ -43,7 +68,7 @@ scrape_configs:
           - edgepulse-runtime:8080
 ```
 
-When Prometheus runs directly on the host, scrape localhost:
+### Prometheus on the host
 
 ```yaml
 scrape_configs:
@@ -54,15 +79,9 @@ scrape_configs:
           - localhost:8080
 ```
 
-## Kubernetes scrape example
+### Kubernetes
 
-When deployed with Helm into the `edgepulse` namespace, the runtime Service is:
-
-```text
-edgepulse-runtime.edgepulse.svc.cluster.local:8080
-```
-
-Example static Prometheus scrape config:
+For a release named `edgepulse-runtime` in namespace `edgepulse`:
 
 ```yaml
 scrape_configs:
@@ -73,24 +92,29 @@ scrape_configs:
           - edgepulse-runtime.edgepulse.svc.cluster.local:8080
 ```
 
-## Useful PromQL queries
+For Prometheus Operator, prefer the chart's optional `ServiceMonitor`; see `docs/servicemonitor.md`.
 
-Device message rate by type and ingestion:
+## Useful PromQL
+
+Device traffic rate:
 
 ```promql
-sum(rate(edgepulse_device_messages_total[$__rate_interval])) by (device_type, ingestion)
+sum(rate(edgepulse_device_messages_total[$__rate_interval]))
+  by (device_type, ingestion)
 ```
 
-Inference rate by prediction, backend, and ingestion:
+Inference rate:
 
 ```promql
-sum(rate(edgepulse_inference_requests_total[$__rate_interval])) by (prediction, model_backend, ingestion)
+sum(rate(edgepulse_inference_requests_total[$__rate_interval]))
+  by (prediction, model_backend, ingestion)
 ```
 
-MQTT message rate by device type and topic:
+MQTT message rate:
 
 ```promql
-sum(rate(edgepulse_mqtt_messages_total[$__rate_interval])) by (device_type, topic)
+sum(rate(edgepulse_mqtt_messages_total[$__rate_interval]))
+  by (device_type, topic)
 ```
 
 P95 inference latency:
@@ -98,51 +122,68 @@ P95 inference latency:
 ```promql
 histogram_quantile(
   0.95,
-  sum(rate(edgepulse_inference_latency_seconds_bucket[$__rate_interval])) by (le, device_type, ingestion, model_backend)
+  sum(rate(edgepulse_inference_latency_seconds_bucket[$__rate_interval]))
+    by (le, device_type, ingestion, model_backend)
 )
 ```
 
-Runtime inference error rate:
+Inference error rate:
 
 ```promql
-sum(rate(edgepulse_inference_errors_total[$__rate_interval])) by (device_type, ingestion, model_backend)
+sum(rate(edgepulse_inference_errors_total[$__rate_interval]))
+  by (device_type, ingestion, model_backend)
 ```
 
-MQTT consumer error rate:
+MQTT processing error rate:
 
 ```promql
 sum(rate(edgepulse_mqtt_errors_total[$__rate_interval])) by (topic)
 ```
 
-Current model backend metadata:
+MQTT disconnected condition:
+
+```promql
+edgepulse_mqtt_connected == 0
+```
+
+Current model metadata:
 
 ```promql
 edgepulse_model_info
 ```
 
+## Readiness and metrics
+
+`/readyz` and `edgepulse_mqtt_connected` complement each other:
+
+```text
+/readyz
+  -> Kubernetes/load-balancer decision: can this instance serve now?
+
+edgepulse_mqtt_connected
+  -> monitoring signal: is the MQTT dependency currently connected?
+```
+
+When MQTT is enabled and disconnected, readiness returns a non-ready response while the process remains live.
+
 ## Grafana dashboard
 
-A ready-to-import Grafana dashboard is available at:
+An importable dashboard is available at:
 
 ```text
 dashboards/grafana/edgepulse-overview.json
 ```
 
-The dashboard includes panels for:
+It includes views for device traffic, inference rates, latency, MQTT traffic/errors, and current model metadata.
 
-- device message rate;
-- inference rate;
-- inference latency;
-- MQTT message rate;
-- runtime and MQTT error rate;
-- current model backend metadata.
+Import it by uploading the JSON in Grafana and selecting the target Prometheus data source.
 
-## Manual Grafana import
+## Next observability increments
 
-In Grafana:
+Useful future additions include:
 
-1. Open Dashboards.
-2. Select New / Import.
-3. Upload `dashboards/grafana/edgepulse-overview.json`.
-4. Select the Prometheus data source.
-5. Import the dashboard.
+- alert rules for prolonged MQTT disconnection;
+- inference error-rate alerts;
+- latency SLO panels;
+- OpenTelemetry traces for ingestion-to-inference flow;
+- richer broker metrics when a production MQTT observability path is introduced.

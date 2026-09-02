@@ -25,6 +25,18 @@ MQTT_PORT = int(
     )
 )
 
+MQTT_USERNAME = os.getenv(
+    "EDGEPULSE_MQTT_USERNAME",
+)
+
+MQTT_PASSWORD = os.getenv(
+    "EDGEPULSE_MQTT_PASSWORD",
+)
+
+MQTT_TLS_CA_FILE = os.getenv(
+    "EDGEPULSE_MQTT_TLS_CA_FILE",
+)
+
 READY_TIMEOUT_SECONDS = 30
 MQTT_PROCESSING_TIMEOUT_SECONDS = 10
 
@@ -138,6 +150,9 @@ def main() -> None:
         port=MQTT_PORT,
         topic="edge/devices/vibration/telemetry",
         payload=mqtt_payload,
+        username=MQTT_USERNAME,
+        password=MQTT_PASSWORD,
+        tls_ca_file=MQTT_TLS_CA_FILE,
     )
 
     wait_for_mqtt_processing()
