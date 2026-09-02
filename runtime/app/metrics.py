@@ -41,3 +41,8 @@ MQTT_ERRORS = Counter(
     "Total number of MQTT consumer errors.",
     ["topic"],
 )
+
+MQTT_CONNECTED = Gauge(
+    "edgepulse_mqtt_connected",
+    "Whether the runtime is currently connected to the MQTT broker.",
+)

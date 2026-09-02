@@ -8,7 +8,7 @@ from app import inference
 from app.config import settings
 from app.metrics import MODEL_INFO
 from app.model_manifest import load_model_manifest
-from app.mqtt_consumer import start_mqtt_consumer
+from app.mqtt_consumer import is_mqtt_connected, start_mqtt_consumer
 from app.schemas import InferenceRequest, InferenceResponse
 from app.service import process_inference_request
 from fastapi import FastAPI, Response, status
@@ -76,6 +76,18 @@ def readyz(response: Response) -> dict[str, object]:
             "model_backend": settings.model_backend,
             "mqtt_enabled": settings.mqtt_enabled,
             "error": readiness_error or "runtime initialization incomplete",
+        }
+
+    if settings.mqtt_enabled and not is_mqtt_connected():
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+        return {
+            "status": "not-ready",
+            "model_name": settings.model_name,
+            "model_version": settings.model_version,
+            "model_backend": settings.model_backend,
+            "mqtt_enabled": True,
+            "error": "mqtt broker not connected",
         }
 
     return {
