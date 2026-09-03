@@ -7,6 +7,7 @@ from typing import Any
 
 from app import inference
 from app.config import settings
+from app.execution_profiles import get_execution_profile
 from app.metrics import MODEL_ARTIFACT_SIZE, MODEL_INFO
 from app.model_manifest import load_model_manifest
 from app.mqtt_consumer import is_mqtt_connected, start_mqtt_consumer
@@ -109,11 +110,19 @@ def readyz(response: Response) -> dict[str, object]:
 
 @app.get("/model/info")
 def model_info() -> dict[str, Any]:
+    execution_profile = get_execution_profile(
+        settings.execution_profile,
+    )
+
     return {
         "model_name": settings.model_name,
         "model_version": settings.model_version,
         "model_backend": settings.model_backend,
         "anomaly_threshold": settings.anomaly_threshold,
+        "execution_profile": {
+            **execution_profile.as_dict(),
+            "active": settings.model_backend == "onnx",
+        },
         "model_manifest": load_model_manifest(),
     }
 

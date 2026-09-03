@@ -5,6 +5,10 @@ from functools import lru_cache
 import numpy as np
 import onnxruntime as ort
 from app.config import settings
+from app.execution_profiles import (
+    ExecutionProfile,
+    get_execution_profile,
+)
 
 
 def run_inference(features: list[float]) -> tuple[str, float, float]:
@@ -49,9 +53,37 @@ def _prediction_from_score(anomaly_score: float) -> tuple[str, float, float]:
     return prediction, round(anomaly_score, 4), round(confidence, 4)
 
 
+def _build_onnx_session_options(
+    profile: ExecutionProfile,
+) -> ort.SessionOptions:
+    options = ort.SessionOptions()
+
+    options.intra_op_num_threads = profile.intra_op_num_threads
+    options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+    options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+    spinning = "1" if profile.allow_spinning else "0"
+
+    options.add_session_config_entry(
+        "session.intra_op.allow_spinning",
+        spinning,
+    )
+
+    return options
+
+
 @lru_cache(maxsize=1)
 def _get_onnx_session() -> ort.InferenceSession:
+    profile = get_execution_profile(
+        settings.execution_profile,
+    )
+
+    session_options = _build_onnx_session_options(
+        profile,
+    )
+
     return ort.InferenceSession(
         settings.model_path,
+        sess_options=session_options,
         providers=["CPUExecutionProvider"],
     )

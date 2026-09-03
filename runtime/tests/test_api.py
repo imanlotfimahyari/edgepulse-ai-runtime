@@ -50,6 +50,9 @@ def test_model_info(client: TestClient) -> None:
     assert "model_backend" in body
     assert "anomaly_threshold" in body
     assert "model_manifest" in body
+    assert "execution_profile" in body
+    assert body["execution_profile"]["name"] == settings.execution_profile
+    assert "active" in body["execution_profile"]
 
 
 def test_infer_valid_request(client: TestClient) -> None:
@@ -151,3 +154,73 @@ def test_readyz_is_ready_when_mqtt_connected(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] == "ready"
+
+
+def test_model_info_reports_active_onnx_profile(
+    monkeypatch,
+) -> None:
+    from app import main
+
+    monkeypatch.setattr(
+        main.settings,
+        "model_backend",
+        "onnx",
+    )
+    monkeypatch.setattr(
+        main.settings,
+        "execution_profile",
+        "eco",
+    )
+    monkeypatch.setattr(
+        main.inference,
+        "_get_onnx_session",
+        lambda: object(),
+    )
+    monkeypatch.setattr(
+        main.settings,
+        "mqtt_enabled",
+        False,
+    )
+
+    with TestClient(main.app) as test_client:
+        response = test_client.get("/model/info")
+
+    assert response.status_code == 200
+
+    profile = response.json()["execution_profile"]
+
+    assert profile["name"] == "eco"
+    assert profile["active"] is True
+    assert profile["intra_op_num_threads"] == 1
+    assert profile["execution_mode"] == "sequential"
+    assert profile["allow_spinning"] is False
+
+
+def test_model_info_reports_profile_inactive_for_rule_backend(
+    monkeypatch,
+) -> None:
+    from app import main
+
+    monkeypatch.setattr(
+        main.settings,
+        "model_backend",
+        "rule-based",
+    )
+    monkeypatch.setattr(
+        main.settings,
+        "execution_profile",
+        "eco",
+    )
+    monkeypatch.setattr(
+        main.settings,
+        "mqtt_enabled",
+        False,
+    )
+
+    with TestClient(main.app) as test_client:
+        response = test_client.get("/model/info")
+
+    profile = response.json()["execution_profile"]
+
+    assert profile["name"] == "eco"
+    assert profile["active"] is False

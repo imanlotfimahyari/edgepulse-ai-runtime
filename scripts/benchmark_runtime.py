@@ -431,6 +431,7 @@ def main() -> int:
             "model_name": model.get("model_name"),
             "model_version": model.get("model_version"),
             "model_backend": model.get("model_backend"),
+            "execution_profile": model.get("execution_profile"),
         },
         "workload": {
             "duration_seconds": elapsed,
@@ -501,6 +502,12 @@ def main() -> int:
     print("=" * 48)
 
     print(f"Backend             {model.get('model_backend')}")
+    execution_profile = model.get(
+        "execution_profile",
+        {},
+    )
+
+    print(f"Profile             {execution_profile.get('name', 'n/a')}")
     print(f"Duration            {elapsed:.2f} s")
     print(f"Concurrency         {args.concurrency}")
     print(f"Requests            {successful_requests}")

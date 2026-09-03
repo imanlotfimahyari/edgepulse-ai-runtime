@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import numpy as np
+import onnxruntime as ort
 from app import inference
+from app.execution_profiles import get_execution_profile
 
 
 def test_rule_based_backend_returns_normal(monkeypatch) -> None:
@@ -74,3 +76,29 @@ def test_onnx_backend_uses_session(monkeypatch) -> None:
     assert prediction == "anomaly"
     assert anomaly_score == 0.75
     assert confidence == 0.75
+
+
+def test_eco_profile_builds_single_threaded_session_options() -> None:
+    profile = get_execution_profile("eco")
+
+    options = inference._build_onnx_session_options(
+        profile,
+    )
+
+    assert options.intra_op_num_threads == 1
+    assert options.execution_mode == ort.ExecutionMode.ORT_SEQUENTIAL
+
+    assert options.get_session_config_entry("session.intra_op.allow_spinning") == "0"
+
+
+def test_balanced_profile_builds_default_thread_session_options() -> None:
+    profile = get_execution_profile("balanced")
+
+    options = inference._build_onnx_session_options(
+        profile,
+    )
+
+    assert options.intra_op_num_threads == 0
+    assert options.execution_mode == ort.ExecutionMode.ORT_SEQUENTIAL
+
+    assert options.get_session_config_entry("session.intra_op.allow_spinning") == "1"

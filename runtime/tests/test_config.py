@@ -12,6 +12,7 @@ def test_default_settings():
     assert settings.mqtt_username is None
     assert settings.mqtt_password is None
     assert settings.mqtt_tls_enabled is False
+    assert settings.execution_profile == "balanced"
 
 
 def test_valid_onnx_backend():
@@ -77,4 +78,32 @@ def test_mqtt_tls_files_require_tls_enabled():
     ):
         Settings(
             mqtt_tls_ca_file="/certs/ca.crt",
+        )
+
+
+def test_default_execution_profile_is_balanced():
+    settings = Settings()
+
+    assert settings.execution_profile == "balanced"
+
+
+@pytest.mark.parametrize(
+    "profile",
+    [
+        "eco",
+        "balanced",
+    ],
+)
+def test_valid_execution_profiles(profile):
+    settings = Settings(
+        execution_profile=profile,
+    )
+
+    assert settings.execution_profile == profile
+
+
+def test_invalid_execution_profile_is_rejected():
+    with pytest.raises(ValidationError):
+        Settings(
+            execution_profile="turbo",
         )

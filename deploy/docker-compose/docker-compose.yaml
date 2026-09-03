@@ -36,6 +36,7 @@ services:
       MODEL_NAME: edgepulse-anomaly-detector
       MODEL_VERSION: ${MODEL_VERSION:-0.9.0}
       MODEL_BACKEND: ${MODEL_BACKEND:-rule-based}
+      EXECUTION_PROFILE: ${EXECUTION_PROFILE:-balanced}
       ANOMALY_THRESHOLD: ${ANOMALY_THRESHOLD:-0.65}
       MQTT_ENABLED: "true"
       MQTT_HOST: mqtt

@@ -1,5 +1,6 @@
 from typing import Literal, Self
 
+from app.execution_profiles import ExecutionProfileName
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -16,6 +17,7 @@ class Settings(BaseSettings):
     model_name: str = "edgepulse-anomaly-detector"
     model_version: str = "0.9.0"
     model_backend: Literal["rule-based", "onnx"] = "rule-based"
+    execution_profile: ExecutionProfileName = "balanced"
     model_path: str = "/app/models/anomaly_score.onnx"
     anomaly_threshold: float = Field(default=0.65, ge=0.0, le=1.0)
 

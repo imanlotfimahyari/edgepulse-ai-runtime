@@ -56,6 +56,8 @@ spec:
               value: {{ .Values.runtime.env.modelVersion | quote }}
             - name: MODEL_BACKEND
               value: {{ .Values.runtime.env.modelBackend | quote }}
+            - name: EXECUTION_PROFILE
+              value: {{ .Values.runtime.env.executionProfile | quote }}
             - name: MODEL_PATH
               value: {{ .Values.runtime.env.modelPath | quote }}
             - name: ANOMALY_THRESHOLD
