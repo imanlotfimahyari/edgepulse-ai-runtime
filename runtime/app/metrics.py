@@ -1,4 +1,5 @@
-from prometheus_client import Counter, Gauge, Histogram
+from app.resources import ResourceCollector
+from prometheus_client import REGISTRY, Counter, Gauge, Histogram
 
 INFERENCE_REQUESTS = Counter(
     "edgepulse_inference_requests_total",
@@ -46,3 +47,16 @@ MQTT_CONNECTED = Gauge(
     "edgepulse_mqtt_connected",
     "Whether the runtime is currently connected to the MQTT broker.",
 )
+
+INFERENCE_IN_PROGRESS = Gauge(
+    "edgepulse_inference_in_progress",
+    "Number of inference requests currently being processed.",
+)
+
+MODEL_ARTIFACT_SIZE = Gauge(
+    "edgepulse_model_artifact_size_bytes",
+    "Size of the configured model artifact on disk.",
+)
+
+RESOURCE_COLLECTOR = ResourceCollector()
+REGISTRY.register(RESOURCE_COLLECTOR)

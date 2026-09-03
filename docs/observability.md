@@ -178,6 +178,57 @@ It includes views for device traffic, inference rates, latency, MQTT traffic/err
 
 Import it by uploading the JSON in Grafana and selecting the target Prometheus data source.
 
+## Edge resource observability
+
+EdgePulse exposes cgroup-aware resource metrics when running on Linux cgroup v2.
+
+These metrics describe the resource budget assigned to the runtime container rather
+than the resources of the entire host.
+
+### Resource metrics
+
+| Metric | Description |
+| --- | --- |
+| `edgepulse_resource_cgroup_v2_available` | Whether cgroup v2 metrics are available |
+| `edgepulse_resource_memory_current_bytes` | Current cgroup memory usage |
+| `edgepulse_resource_memory_peak_bytes` | Peak cgroup memory usage |
+| `edgepulse_resource_memory_limited` | Whether a finite memory limit is configured |
+| `edgepulse_resource_memory_limit_bytes` | Configured memory limit |
+| `edgepulse_resource_memory_headroom_bytes` | Remaining memory before the limit |
+| `edgepulse_resource_memory_utilization_ratio` | Memory usage divided by memory limit |
+| `edgepulse_resource_cpu_limited` | Whether a finite CPU quota is configured |
+| `edgepulse_resource_cpu_limit_cores` | CPU quota expressed as CPU cores |
+| `edgepulse_inference_in_progress` | Number of currently executing inference operations |
+| `edgepulse_model_artifact_size_bytes` | Size of the configured model artifact |
+
+The Python Prometheus client also exports process-level metrics such as
+`process_resident_memory_bytes` and `process_cpu_seconds_total`.
+
+The process and cgroup metrics answer different questions:
+
+- process metrics describe the Python runtime process;
+- cgroup metrics describe the resource consumption and limits of the container.
+
+For example, memory utilization can be queried with:
+
+```promql
+edgepulse_resource_memory_utilization_ratio
+```
+
+CPU consumption can be compared with the configured CPU budget using:
+
+```promql
+rate(process_cpu_seconds_total[$__rate_interval])
+```
+
+and:
+
+```promql
+edgepulse_resource_cpu_limit_cores
+```
+
+The Grafana dashboard includes an Edge Resource Efficiency section showing memory utilization, memory headroom, CPU budget, model size, memory usage versus limit, CPU usage versus limit, and inference concurrency.
+
 ## Next observability increments
 
 Useful future additions include:

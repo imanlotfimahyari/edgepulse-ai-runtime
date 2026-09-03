@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from app import inference
 from app.config import settings
-from app.metrics import MODEL_INFO
+from app.metrics import MODEL_ARTIFACT_SIZE, MODEL_INFO
 from app.model_manifest import load_model_manifest
 from app.mqtt_consumer import is_mqtt_connected, start_mqtt_consumer
 from app.schemas import InferenceRequest, InferenceResponse
@@ -25,6 +26,13 @@ async def lifespan(_app: FastAPI):
     global runtime_ready, readiness_error
 
     try:
+        model_path = Path(settings.model_path)
+
+        if model_path.is_file():
+            MODEL_ARTIFACT_SIZE.set(model_path.stat().st_size)
+        else:
+            MODEL_ARTIFACT_SIZE.set(0)
+
         if settings.model_backend == "onnx":
             inference._get_onnx_session()
 
