@@ -2,7 +2,7 @@
 
 EdgePulse AI Runtime is a compact, production-shaped edge-AI inference platform for industrial and IoT workloads.
 
-It accepts device telemetry over HTTP or MQTT, runs local anomaly inference through a rule-based or ONNX Runtime backend, exposes operational metrics, and can be exercised locally with Docker Compose or deployed to Kubernetes with Helm.
+It accepts device telemetry over HTTP or MQTT, runs local anomaly inference through a rule-based or ONNX Runtime backend, exposes operational and resource metrics, and can be exercised locally with Docker Compose or deployed to Kubernetes with Helm.
 
 The project is intentionally focused on **AI infrastructure and runtime operations**, not model research.
 
@@ -24,30 +24,38 @@ Simulated edge devices
                                       - configuration validation
                                       - rule-based / ONNX inference
                                       - readiness / liveness
+                                      - cgroup resource awareness
                                       - Prometheus metrics
                                                 |
-                                                v
-                                      Prometheus / Grafana
+                         +----------------------+------------------+
+                         |                                         |
+                         v                                         v
+                Prometheus / Grafana                    benchmark tooling
 ```
 
 The repository demonstrates:
 
-- HTTP and MQTT telemetry ingestion;
-- local rule-based and ONNX Runtime inference;
-- validated runtime configuration;
-- health and dependency-aware readiness checks;
-- resilient MQTT reconnect behavior;
-- MQTT username/password authentication and TLS support;
-- optional MQTT client certificates for mTLS-capable brokers;
-- Prometheus-compatible metrics and a Grafana dashboard;
-- Docker Compose integration testing across the real HTTP and MQTT paths;
-- Helm-based Kubernetes deployment;
-- Kubernetes Secret references for MQTT credentials and TLS material;
-- local K3s validation with k3d;
-- automated tests and coverage;
-- dependency and IaC security checks;
-- container SBOM generation and vulnerability scanning;
-- GHCR image publishing and keyless Cosign signing.
+* HTTP and MQTT telemetry ingestion;
+* local rule-based and ONNX Runtime inference;
+* validated runtime configuration;
+* health and dependency-aware readiness checks;
+* resilient MQTT reconnect behavior;
+* MQTT username/password authentication and TLS support;
+* optional MQTT client certificates for mTLS-capable brokers;
+* Prometheus-compatible metrics and a Grafana dashboard;
+* Linux cgroup v2 CPU and memory resource awareness;
+* container memory usage, limits, headroom, and utilization metrics;
+* inference concurrency and model-footprint metrics;
+* resource-aware runtime benchmarking;
+* throughput, latency, CPU, memory, and inference-efficiency measurements;
+* Docker Compose integration testing across the real HTTP and MQTT paths;
+* Helm-based Kubernetes deployment;
+* Kubernetes Secret references for MQTT credentials and TLS material;
+* local K3s validation with k3d;
+* automated tests and coverage;
+* dependency and IaC security checks;
+* container SBOM generation and vulnerability scanning;
+* GHCR image publishing and keyless Cosign signing.
 
 ## Current version
 
@@ -61,20 +69,20 @@ ghcr.io/imanlotfimahyari/edgepulse-runtime:0.9.0
 
 ## Runtime endpoints
 
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /healthz` | Liveness: confirms that the process is running. |
-| `GET /readyz` | Readiness: confirms that the runtime can serve inference; when MQTT is enabled, MQTT connectivity is also required. |
-| `GET /model/info` | Returns model and backend metadata. |
-| `POST /infer` | Runs inference for HTTP telemetry. |
-| `GET /metrics` | Exposes Prometheus-compatible runtime metrics. |
+| Endpoint          | Purpose                                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `GET /healthz`    | Liveness: confirms that the process is running.                                                                     |
+| `GET /readyz`     | Readiness: confirms that the runtime can serve inference; when MQTT is enabled, MQTT connectivity is also required. |
+| `GET /model/info` | Returns model and backend metadata.                                                                                 |
+| `POST /infer`     | Runs inference for HTTP telemetry.                                                                                  |
+| `GET /metrics`    | Exposes Prometheus-compatible application and resource metrics.                                                     |
 
 ## Inference backends
 
-| Backend | Purpose |
-| --- | --- |
+| Backend      | Purpose                                                                 |
+| ------------ | ----------------------------------------------------------------------- |
 | `rule-based` | Lightweight deterministic anomaly scoring for runtime/platform testing. |
-| `onnx` | ONNX Runtime inference using the packaged anomaly-scoring model. |
+| `onnx`       | ONNX Runtime inference using the packaged anomaly-scoring model.        |
 
 Select the backend with:
 
@@ -89,6 +97,15 @@ When ONNX mode is selected, the runtime loads the configured model during applic
 ## Quick start: secured Docker Compose stack
 
 The Compose environment uses an authenticated TLS-enabled Mosquitto broker. Test PKI material and the local password database are generated into an ephemeral Docker volume; private keys are not committed to the repository.
+
+The runtime is constrained to an edge-oriented local resource budget:
+
+```text
+CPU:     0.5 core
+Memory:  512 MiB
+```
+
+EdgePulse discovers these limits through Linux cgroup v2 rather than through application-specific hard-coded configuration.
 
 Clean any previous local stack and security volume:
 
@@ -171,23 +188,61 @@ The current generic simulator CLI is most convenient for HTTP and plaintext MQTT
 
 ## Observability
 
-Useful metrics include:
+Application and dependency metrics include:
 
 ```text
 edgepulse_device_messages_total
 edgepulse_inference_requests_total
 edgepulse_inference_latency_seconds
 edgepulse_inference_errors_total
+edgepulse_inference_in_progress
+
 edgepulse_mqtt_connected
 edgepulse_mqtt_messages_total
 edgepulse_mqtt_errors_total
+
 edgepulse_model_info
+edgepulse_model_artifact_size_bytes
+```
+
+Resource metrics include:
+
+```text
+edgepulse_resource_cgroup_v2_available
+
+edgepulse_resource_memory_current_bytes
+edgepulse_resource_memory_peak_bytes
+edgepulse_resource_memory_limited
+edgepulse_resource_memory_limit_bytes
+edgepulse_resource_memory_headroom_bytes
+edgepulse_resource_memory_utilization_ratio
+
+edgepulse_resource_cpu_limited
+edgepulse_resource_cpu_limit_cores
+```
+
+The Prometheus Python client also exposes process metrics including:
+
+```text
+process_cpu_seconds_total
+process_resident_memory_bytes
+```
+
+The distinction is intentional:
+
+```text
+process metrics
+    -> Python process behavior
+
+cgroup metrics
+    -> container resource consumption and budget
 ```
 
 Example checks:
 
 ```bash
 curl -s http://localhost:8080/metrics | grep edgepulse_mqtt_connected
+curl -s http://localhost:8080/metrics | grep edgepulse_resource
 curl -s http://localhost:8080/metrics | grep 'ingestion="mqtt"'
 curl -s http://localhost:8080/metrics | grep 'ingestion="http"'
 curl -s http://localhost:8080/metrics | grep 'model_backend="onnx"'
@@ -199,7 +254,48 @@ A Grafana dashboard is available at:
 dashboards/grafana/edgepulse-overview.json
 ```
 
+The dashboard includes application traffic, inference behavior, MQTT state, model metadata, and an **Edge Resource Efficiency** section for CPU and memory budget visibility.
+
 See [docs/observability.md](docs/observability.md) for PromQL examples and [docs/servicemonitor.md](docs/servicemonitor.md) for Prometheus Operator integration.
+
+## Runtime benchmarking
+
+EdgePulse includes a lightweight benchmark client:
+
+```text
+scripts/benchmark_runtime.py
+```
+
+Example:
+
+```bash
+python scripts/benchmark_runtime.py \
+  --duration 20 \
+  --warmup 2 \
+  --concurrency 2 \
+  --output /tmp/edgepulse-benchmark.json
+```
+
+The benchmark measures:
+
+* throughput;
+* client p50/p95/p99 latency;
+* inference p50/p95/p99 latency;
+* CPU consumption;
+* CPU-budget utilization;
+* average and maximum observed memory;
+* memory budget and headroom;
+* inferences per CPU-second.
+
+A concurrency sweep can be used to identify where additional parallelism stops producing useful throughput and begins primarily increasing tail latency.
+
+Initial constrained-runtime experiments using a 0.5-core CPU limit and 512 MiB memory limit showed that the current workload becomes CPU constrained well before it becomes memory constrained.
+
+For the current rule-based and demo ONNX backends, concurrency 2 is a useful low-latency operating point under that resource budget. Higher concurrency can provide limited additional throughput but with substantially higher tail latency.
+
+These measurements describe the current demo workload and host environment. They are not intended as general ONNX Runtime performance claims.
+
+See [docs/benchmarking.md](docs/benchmarking.md) for methodology, metrics, reproducibility guidance, and interpretation.
 
 ## Kubernetes and Helm
 
@@ -242,29 +338,29 @@ See [charts/edgepulse-runtime/README.md](charts/edgepulse-runtime/README.md) for
 
 The repository uses GitHub Actions to validate:
 
-- pre-commit hooks;
-- Python compilation;
-- Ruff lint and formatting;
-- pytest runtime tests with coverage;
-- Helm lint and template rendering;
-- Docker image builds;
-- Python dependency audits;
-- Checkov Helm/Dockerfile scanning;
-- secured Docker Compose E2E validation.
+* pre-commit hooks;
+* Python compilation;
+* Ruff lint and formatting;
+* pytest runtime tests with coverage;
+* Helm lint and template rendering;
+* Docker image builds;
+* Python dependency audits;
+* Checkov Helm/Dockerfile scanning;
+* secured Docker Compose E2E validation.
 
 Separate workflows provide:
 
-- SPDX SBOM generation;
-- container vulnerability scanning;
-- GHCR image publishing;
-- keyless Cosign image signing.
+* SPDX SBOM generation;
+* container vulnerability scanning;
+* GHCR image publishing;
+* keyless Cosign image signing.
 
 See:
 
-- [docs/security.md](docs/security.md)
-- [docs/container-security.md](docs/container-security.md)
-- [docs/release.md](docs/release.md)
-- [docs/image-signing.md](docs/image-signing.md)
+* [docs/security.md](docs/security.md)
+* [docs/container-security.md](docs/container-security.md)
+* [docs/release.md](docs/release.md)
+* [docs/image-signing.md](docs/image-signing.md)
 
 ## Repository structure
 
@@ -276,31 +372,32 @@ See:
 │   └── grafana/                  # Importable Grafana dashboard
 ├── deploy/
 │   └── docker-compose/           # Secured local integration environment
-├── docs/                         # Architecture, operations, security, release guides
+├── docs/                         # Architecture, operations, benchmarking, security guides
 ├── runtime/                      # FastAPI runtime, inference backends, tests
-├── scripts/                      # Model utilities and Compose E2E runner
+├── scripts/                      # Benchmark, model, and Compose E2E utilities
 └── simulators/                   # Simulated edge-device producers
 ```
 
 ## Documentation map
 
-| Document | Use it for |
-| --- | --- |
-| [Architecture](docs/architecture.md) | Components, data paths, readiness, security boundaries. |
-| [Demo walkthrough](docs/demo-walkthrough.md) | A concise technical demonstration of the project. |
-| [Local k3d/K3s](docs/k3d-k3s-local.md) | Kubernetes validation on a workstation. |
-| [Observability](docs/observability.md) | Metrics, PromQL, Grafana, MQTT connectivity. |
-| [ServiceMonitor](docs/servicemonitor.md) | Prometheus Operator integration. |
-| [Security](docs/security.md) | Runtime, MQTT, Kubernetes, and CI security posture. |
-| [Container security](docs/container-security.md) | SBOM and vulnerability scan workflow. |
-| [Release](docs/release.md) | Version-tagged GHCR publication workflow. |
-| [Image signing](docs/image-signing.md) | Keyless Cosign signing and verification. |
-| [Troubleshooting](docs/troubleshooting.md) | Runtime, MQTT, TLS, Compose, and Kubernetes diagnostics. |
-| [Roadmap](docs/project-roadmap.md) | Current state and next production-oriented increments. |
+| Document                                         | Use it for                                                              |
+| ------------------------------------------------ | ----------------------------------------------------------------------- |
+| [Architecture](docs/architecture.md)             | Components, data paths, readiness, security boundaries.                 |
+| [Demo walkthrough](docs/demo-walkthrough.md)     | A concise technical demonstration of the project.                       |
+| [Local k3d/K3s](docs/k3d-k3s-local.md)           | Kubernetes validation on a workstation.                                 |
+| [Observability](docs/observability.md)           | Application/resource metrics, PromQL, Grafana, MQTT connectivity.       |
+| [Runtime benchmarking](docs/benchmarking.md)     | Throughput, latency, CPU/memory efficiency, and saturation experiments. |
+| [ServiceMonitor](docs/servicemonitor.md)         | Prometheus Operator integration.                                        |
+| [Security](docs/security.md)                     | Runtime, MQTT, Kubernetes, and CI security posture.                     |
+| [Container security](docs/container-security.md) | SBOM and vulnerability scan workflow.                                   |
+| [Release](docs/release.md)                       | Version-tagged GHCR publication workflow.                               |
+| [Image signing](docs/image-signing.md)           | Keyless Cosign signing and verification.                                |
+| [Troubleshooting](docs/troubleshooting.md)       | Runtime, MQTT, TLS, Compose, and Kubernetes diagnostics.                |
+| [Roadmap](docs/project-roadmap.md)               | Current state and next production-oriented increments.                  |
 
 ## Scope
 
-EdgePulse is deliberately small enough to understand end to end. Its purpose is to demonstrate the operational path of an AI workload—from telemetry ingestion through inference, deployment, observability, security, and release—without hiding the core concepts behind a large framework.
+EdgePulse is deliberately small enough to understand end to end. Its purpose is to demonstrate the operational path of an AI workload—from telemetry ingestion through inference, deployment, observability, resource management, benchmarking, security, and release—without hiding the core concepts behind a large framework.
 
 It is not intended to be a complete device-management platform, training platform, or production MQTT PKI system.
 
