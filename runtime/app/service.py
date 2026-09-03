@@ -7,6 +7,7 @@ from app.inference import run_inference
 from app.metrics import (
     DEVICE_MESSAGES,
     INFERENCE_ERRORS,
+    INFERENCE_IN_PROGRESS,
     INFERENCE_LATENCY,
     INFERENCE_REQUESTS,
 )
@@ -25,7 +26,8 @@ def process_inference_request(
             ingestion=ingestion,
         ).inc()
 
-        prediction, anomaly_score, confidence = run_inference(request.features)
+        with INFERENCE_IN_PROGRESS.track_inprogress():
+            prediction, anomaly_score, confidence = run_inference(request.features)
 
         latency_seconds = time.perf_counter() - start_time
 

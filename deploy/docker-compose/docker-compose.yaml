@@ -29,6 +29,8 @@ services:
       context: ../../runtime
       dockerfile: Dockerfile
     container_name: edgepulse-runtime
+    cpus: "0.50"
+    mem_limit: 512m
     environment:
       SERVICE_NAME: edgepulse-ai-runtime
       MODEL_NAME: edgepulse-anomaly-detector
