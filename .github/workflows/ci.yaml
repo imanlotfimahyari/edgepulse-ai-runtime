@@ -49,29 +49,31 @@ jobs:
             runtime/requirements-test.txt
             runtime/requirements.txt
             simulators/requirements.txt
+            requirements-tools.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r runtime/requirements-test.txt
           python -m pip install -r simulators/requirements.txt
+          python -m pip install -r requirements-tools.txt
           python -m pip install ruff==0.16.5
 
       - name: Compile Python files
         run: |
-          python -m compileall runtime simulators
+          python -m compileall runtime simulators scripts
 
       - name: Ruff check
         run: |
-          ruff check runtime simulators
+          ruff check runtime simulators scripts
 
       - name: Ruff format check
         run: |
-          ruff format --check runtime simulators
+          ruff format --check runtime simulators scripts
 
       - name: Run runtime tests
         run: |
-          PYTHONPATH=runtime pytest runtime/tests -v \
+          PYTHONPATH=runtime:. pytest runtime/tests -v \
             --cov=runtime/app \
             --cov-report=term-missing
 
@@ -129,6 +131,11 @@ jobs:
         uses: pypa/gh-action-pip-audit@v1.1.0
         with:
           inputs: simulators/requirements.txt
+
+      - name: Audit tooling requirements
+        uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          inputs: requirements-tools.txt
 
   iac-security:
     name: IaC security scan
