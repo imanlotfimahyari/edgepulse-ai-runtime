@@ -28,10 +28,11 @@ Simulated edge devices
                                       - cgroup resource awareness
                                       - Prometheus metrics
                                                 |
-                         +----------------------+------------------+
-                         |                                         |
-                         v                                         v
-                Prometheus / Grafana                    benchmark tooling
+                    +---------------------------+-------------------------+
+                    |                           |                         |
+                    v                           v                         v
+              edgepulse-top             Prometheus / Grafana       benchmark tooling
+              node-local state          history / dashboards       controlled load
 ```
 
 The repository demonstrates:
@@ -50,6 +51,9 @@ The repository demonstrates:
 * resource-aware runtime benchmarking;
 * throughput, latency, CPU, memory, and inference-efficiency measurements;
 * evidence-backed ONNX execution profiles for constrained edge runtimes;
+* a live node-local `edgepulse-top` operational TUI;
+* rolling CPU and inference-rate trends;
+* graceful degraded telemetry handling;
 * Docker Compose integration testing across the real HTTP and MQTT paths;
 * Helm-based Kubernetes deployment;
 * Kubernetes Secret references for MQTT credentials and TLS material;
@@ -281,6 +285,8 @@ cgroup metrics
     -> container resource consumption and budget
 ```
 
+Inference latency uses explicit sub-millisecond histogram buckets so local and Prometheus-based tooling can estimate useful latency percentiles for the current lightweight ONNX workload.
+
 Example checks:
 
 ```bash
@@ -300,6 +306,89 @@ dashboards/grafana/edgepulse-overview.json
 The dashboard includes application traffic, inference behavior, MQTT state, model metadata, and an **Edge Resource Efficiency** section for CPU and memory budget visibility.
 
 See [docs/observability.md](docs/observability.md) for PromQL examples and [docs/servicemonitor.md](docs/servicemonitor.md) for Prometheus Operator integration.
+
+## `edgepulse-top`
+
+EdgePulse includes a live terminal dashboard for immediate node-local operational visibility:
+
+```text
+scripts/edgepulse_top.py
+```
+
+Install the local tooling dependency:
+
+```bash
+pip install -r requirements-tools.txt
+```
+
+Run the live dashboard:
+
+```bash
+python scripts/edgepulse_top.py
+```
+
+The dashboard consumes the runtime's existing HTTP and Prometheus interfaces rather than creating a separate monitoring path.
+
+It displays:
+
+* liveness and readiness;
+* MQTT connection state;
+* telemetry scrape state;
+* model name and version;
+* inference backend;
+* ONNX execution profile;
+* model artifact size;
+* CPU usage versus cgroup CPU budget;
+* memory usage, limit, utilization, and headroom;
+* inference request rate;
+* inference concurrency;
+* inference error rate;
+* MQTT message and error rates;
+* histogram-derived inference p50/p95/p99 latency;
+* rolling CPU-utilization and inference-rate trends.
+
+Resource pressure is intentionally distinguished from failure.
+
+For example, CPU utilization approaching the configured quota is shown as a warning/busy condition rather than automatically declaring the runtime unhealthy. Memory pressure uses more conservative warning thresholds because exhaustion can result in OOM termination.
+
+Transient telemetry failures also preserve the last successfully collected dashboard:
+
+```text
+successful polls
+      |
+      v
+     LIVE
+
+single/transient failures
+      |
+      v
+   DEGRADED
+   last-known state retained
+
+repeated failures
+      |
+      v
+  UNREACHABLE
+```
+
+Single-snapshot modes are also available:
+
+```bash
+python scripts/edgepulse_top.py --once
+python scripts/edgepulse_top.py --json
+```
+
+The tool intentionally has a different responsibility from Grafana:
+
+```text
+edgepulse-top
+    -> immediate state of one edge runtime
+
+Grafana
+    -> historical and fleet-oriented visibility
+```
+
+See [docs/edgepulse-top.md](docs/edgepulse-top.md) for architecture, metrics, rate calculations, histogram percentile behavior, and usage.
 
 ## Runtime benchmarking
 
@@ -376,7 +465,7 @@ helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
 
 The chart can deploy the bundled Mosquitto broker and supports secure MQTT configuration through **existing Kubernetes Secrets**. It does not generate production credentials or certificates.
 
-This allows the operational ownership to remain clean:
+This allows operational ownership to remain clean:
 
 ```text
 cert-manager / external PKI  ---> TLS Secret --------+
@@ -428,7 +517,7 @@ See:
 │   └── docker-compose/           # Secured local integration environment
 ├── docs/                         # Architecture, operations, benchmarking, security guides
 ├── runtime/                      # FastAPI runtime, inference backends, execution profiles, tests
-├── scripts/                      # Benchmark, model, and Compose E2E utilities
+├── scripts/                      # Benchmark, edgepulse-top, model, and E2E utilities
 └── simulators/                   # Simulated edge-device producers
 ```
 
@@ -440,6 +529,7 @@ See:
 | [Demo walkthrough](docs/demo-walkthrough.md)     | A concise technical demonstration of the project.                                          |
 | [Local k3d/K3s](docs/k3d-k3s-local.md)           | Kubernetes validation on a workstation.                                                    |
 | [Observability](docs/observability.md)           | Application/resource metrics, PromQL, Grafana, MQTT connectivity.                          |
+| [`edgepulse-top`](docs/edgepulse-top.md)         | Live node-local operational TUI, rates, trends, and degraded telemetry behavior.           |
 | [Runtime benchmarking](docs/benchmarking.md)     | Throughput, latency, execution-profile, CPU/memory efficiency, and saturation experiments. |
 | [ServiceMonitor](docs/servicemonitor.md)         | Prometheus Operator integration.                                                           |
 | [Security](docs/security.md)                     | Runtime, MQTT, Kubernetes, and CI security posture.                                        |
@@ -451,7 +541,7 @@ See:
 
 ## Scope
 
-EdgePulse is deliberately small enough to understand end to end. Its purpose is to demonstrate the operational path of an AI workload—from telemetry ingestion through inference, deployment, observability, resource management, benchmarking, execution tuning, security, and release—without hiding the core concepts behind a large framework.
+EdgePulse is deliberately small enough to understand end to end. Its purpose is to demonstrate the operational path of an AI workload—from telemetry ingestion through inference, deployment, observability, resource management, benchmarking, execution tuning, local operations, security, and release—without hiding the core concepts behind a large framework.
 
 It is not intended to be a complete device-management platform, training platform, or production MQTT PKI system.
 

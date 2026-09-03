@@ -78,6 +78,7 @@ Implemented today:
 * CPU quota expressed as cores;
 * model artifact-size metric;
 * inference-in-progress metric;
+* low-latency inference histogram buckets;
 * Grafana runtime dashboard;
 * Grafana Edge Resource Efficiency panels.
 
@@ -101,7 +102,7 @@ Implemented today:
 
 ### Resource-aware ONNX execution
 
-EdgePulse now supports two benchmark-informed execution profiles:
+EdgePulse supports two benchmark-informed execution profiles:
 
 ```text
 eco
@@ -128,7 +129,56 @@ Parallel graph execution was tested as a performance-oriented candidate and reje
 
 A separate single-threaded spinning candidate was tested for latency-oriented behavior and removed because it did not provide a repeatable latency advantage.
 
-This leaves two simple and evidence-backed policies rather than several arbitrary presets.
+### Local edge operational TUI
+
+EdgePulse now includes:
+
+```text
+edgepulse-top
+```
+
+The TUI consumes the existing runtime APIs and Prometheus telemetry.
+
+It provides immediate node-local visibility into:
+
+* runtime health;
+* runtime readiness;
+* MQTT connectivity;
+* telemetry collection state;
+* model/backend/profile;
+* model artifact size;
+* CPU use versus cgroup budget;
+* memory use, limit, headroom, and utilization;
+* inference request and error rates;
+* inference concurrency;
+* MQTT message and error rates;
+* live inference latency p50/p95/p99 estimates;
+* rolling CPU and inference-rate trends.
+
+It distinguishes:
+
+```text
+LIVE
+DEGRADED
+UNREACHABLE
+```
+
+for telemetry collection and retains the last successful state during transient polling failures.
+
+Resource visualization also distinguishes expected CPU saturation from runtime failure.
+
+The roles remain deliberately separate:
+
+```text
+edgepulse-top
+    -> immediate node-local operational state
+
+Grafana
+    -> historical and fleet-oriented observability
+
+benchmark_runtime.py
+    -> controlled experiment results
+```
 
 ### Quality and supply chain
 
@@ -144,61 +194,41 @@ This leaves two simple and evidence-backed policies rather than several arbitrar
 
 ## Recommended next increments
 
-### 1. Local edge operational TUI
+### 1. ONNX optimization, memory policy, and quantization
 
-Add a lightweight terminal interface:
+The next increment should move from execution-policy tuning to model/runtime optimization.
 
-```text
-edgepulse-top
-```
-
-The TUI should consume the same telemetry already exposed through Prometheus rather than introducing a second monitoring model.
-
-Useful local views include:
-
-* readiness;
-* model/backend;
-* execution profile;
-* MQTT connectivity;
-* CPU usage versus budget;
-* memory usage versus budget;
-* memory headroom;
-* inference rate;
-* p50/p95 latency;
-* inference concurrency;
-* errors;
-* future edge/cloud connectivity state.
-
-The roles should remain distinct:
-
-```text
-edgepulse-top
-    -> immediate local edge-node state
-
-Grafana
-    -> historical and fleet-oriented observability
-```
-
-### 2. ONNX optimization, memory policy, and quantization
-
-Use the benchmark framework to compare model execution variants.
+Use the existing benchmark and `edgepulse-top` tooling to compare model execution variants.
 
 Useful experiments include:
 
-* ONNX Runtime graph optimization;
-* CPU memory-arena behavior;
+* FP32 baseline model;
+* INT8 quantized model;
+* model artifact-size reduction;
+* inference latency;
+* throughput;
+* CPU consumption;
+* inferences per CPU-second;
+* memory use;
+* memory headroom;
+* ONNX Runtime CPU memory-arena behavior;
 * memory-pattern optimization;
-* constrained-memory execution;
-* FP32 versus quantized models;
-* INT8 inference;
-* model-size reduction;
-* latency and throughput changes;
-* memory changes;
+* graph optimization configuration;
+* constrained-memory behavior;
 * accuracy delta where applicable.
 
-A future memory-oriented policy should be introduced only if measurements demonstrate a useful tradeoff.
+A memory-oriented policy should be introduced only if measurements demonstrate a useful tradeoff.
 
-### 3. Efficiency dashboard
+Potential future memory modes may include:
+
+```text
+standard
+compact
+```
+
+but the names should not become public configuration until benchmark evidence justifies them.
+
+### 2. Efficiency dashboard
 
 Extend the Grafana resource-efficiency view with:
 
@@ -206,12 +236,13 @@ Extend the Grafana resource-efficiency view with:
 * inferences per CPU-second;
 * backend comparison;
 * execution-profile comparison;
+* quantized versus non-quantized model comparison;
 * saturation indicators;
 * benchmark-informed capacity context.
 
 Grafana remains the historical/fleet view; `edgepulse-top` remains the immediate node-local view.
 
-### 4. Connectivity-aware edge operation
+### 3. Connectivity-aware edge operation
 
 Introduce connectivity policies as a separate concern from inference execution.
 
@@ -254,7 +285,7 @@ connectivity_profile
     -> how edge results use the network
 ```
 
-### 5. Offline-first operation
+### 4. Offline-first operation
 
 After connectivity-aware forwarding exists, add store-and-forward behavior for intermittent WAN connectivity.
 
@@ -289,7 +320,7 @@ Useful capabilities include:
 
 This phase demonstrates distributed-systems concerns such as partial failure, eventual consistency, backpressure, retries, and local autonomy.
 
-### 6. Power-aware experimentation
+### 5. Power-aware experimentation
 
 CPU utilization is not equivalent to electrical power consumption.
 
@@ -311,7 +342,7 @@ inferences per joule
 
 This would allow power-aware execution policies to be justified by measured energy consumption rather than CPU proxies.
 
-### 7. Device identity and authorization
+### 6. Device identity and authorization
 
 Today, `device_id` and `device_type` are payload fields rather than managed identities.
 
@@ -323,7 +354,7 @@ A useful incremental implementation would:
 * add authorization policy for publish topics;
 * demonstrate per-device or per-group MQTT ACLs.
 
-### 8. Model lifecycle and artifact delivery
+### 7. Model lifecycle and artifact delivery
 
 The runtime already exposes model metadata and verifies the packaged artifact checksum.
 
@@ -361,7 +392,7 @@ Useful capabilities include:
 * rollback;
 * optional lightweight registry integration.
 
-### 9. MQTT consumer scaling semantics
+### 8. MQTT consumer scaling semantics
 
 Explore:
 
@@ -371,7 +402,7 @@ Explore:
 * malformed-message retry/dead-letter behavior;
 * reconnect behavior under multiple replicas.
 
-### 10. GitOps deployment
+### 9. GitOps deployment
 
 Add Argo CD when repeated declarative promotion becomes useful:
 
@@ -381,7 +412,7 @@ Add Argo CD when repeated declarative promotion becomes useful:
 * profile/configuration promotion;
 * drift and reconciliation demonstration.
 
-### 11. SLO-oriented observability
+### 10. SLO-oriented observability
 
 Extend the current telemetry with:
 
@@ -393,7 +424,11 @@ Extend the current telemetry with:
 * benchmark-informed capacity thresholds;
 * OpenTelemetry tracing.
 
-### 12. Fleet and model control plane
+This is also the appropriate point to introduce semantic health statuses for inference latency or error rate.
+
+Until SLOs exist, raw measured state is preferable to arbitrary green/red health labels.
+
+### 11. Fleet and model control plane
 
 A mature later-stage demonstration could expose:
 
@@ -419,6 +454,8 @@ compute-aware execution
       |
 local observability + benchmarking
       |
+model optimization / quantization
+      |
 connectivity-aware forwarding
       |
 offline buffering/replay
@@ -443,4 +480,5 @@ Avoid adding complexity unless it demonstrates a specific infrastructure concept
 * bespoke PKI when cert-manager or external PKI already models the lifecycle well;
 * custom monitoring stack separate from Prometheus;
 * arbitrary execution profiles without benchmark evidence;
+* arbitrary health states without SLO definitions;
 * power-saving claims without actual energy measurements.
