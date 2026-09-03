@@ -19,6 +19,7 @@ runtime:
     modelName: edgepulse-anomaly-detector
     modelVersion: "0.9.0"
     modelBackend: rule-based
+    executionProfile: balanced
     modelPath: /app/models/anomaly_score.onnx
     anomalyThreshold: "0.65"
     mqttEnabled: "true"

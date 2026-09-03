@@ -23,6 +23,7 @@ Simulated edge devices
                                       - MQTT consumer
                                       - configuration validation
                                       - rule-based / ONNX inference
+                                      - ONNX execution profiles
                                       - readiness / liveness
                                       - cgroup resource awareness
                                       - Prometheus metrics
@@ -48,6 +49,7 @@ The repository demonstrates:
 * inference concurrency and model-footprint metrics;
 * resource-aware runtime benchmarking;
 * throughput, latency, CPU, memory, and inference-efficiency measurements;
+* evidence-backed ONNX execution profiles for constrained edge runtimes;
 * Docker Compose integration testing across the real HTTP and MQTT paths;
 * Helm-based Kubernetes deployment;
 * Kubernetes Secret references for MQTT credentials and TLS material;
@@ -73,7 +75,7 @@ ghcr.io/imanlotfimahyari/edgepulse-runtime:0.9.0
 | ----------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `GET /healthz`    | Liveness: confirms that the process is running.                                                                     |
 | `GET /readyz`     | Readiness: confirms that the runtime can serve inference; when MQTT is enabled, MQTT connectivity is also required. |
-| `GET /model/info` | Returns model and backend metadata.                                                                                 |
+| `GET /model/info` | Returns model, backend, manifest, and execution-profile metadata.                                                   |
 | `POST /infer`     | Runs inference for HTTP telemetry.                                                                                  |
 | `GET /metrics`    | Exposes Prometheus-compatible application and resource metrics.                                                     |
 
@@ -93,6 +95,47 @@ MODEL_BACKEND=onnx
 ```
 
 When ONNX mode is selected, the runtime loads the configured model during application startup. A model initialization failure makes `/readyz` report not ready.
+
+## ONNX execution profiles
+
+ONNX inference can be configured with:
+
+```text
+EXECUTION_PROFILE
+```
+
+Current profiles:
+
+| Profile    | ONNX strategy                                                                             | Intended use                                     |
+| ---------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `eco`      | One intra-op thread, sequential execution, thread spinning disabled.                      | Constrained edge execution and CPU efficiency.   |
+| `balanced` | ONNX Runtime automatic intra-op threading, sequential execution, thread spinning enabled. | General-purpose/default ONNX execution baseline. |
+
+The default is:
+
+```text
+EXECUTION_PROFILE=balanced
+```
+
+Example:
+
+```bash
+MODEL_BACKEND=onnx \
+EXECUTION_PROFILE=eco \
+docker compose \
+  -f deploy/docker-compose/docker-compose.yaml \
+  up -d --build --force-recreate edgepulse-runtime
+```
+
+The resolved execution profile is exposed through:
+
+```text
+GET /model/info
+```
+
+Execution profiles apply only to the ONNX backend. When the rule-based backend is selected, the configured profile is reported but marked inactive.
+
+The profiles were selected through benchmark experiments rather than assumed from their names. More aggressive parallel and latency-oriented candidates were tested and rejected because they did not provide useful tradeoffs for the current small ONNX graph under the constrained test budget.
 
 ## Quick start: secured Docker Compose stack
 
@@ -285,13 +328,14 @@ The benchmark measures:
 * CPU-budget utilization;
 * average and maximum observed memory;
 * memory budget and headroom;
-* inferences per CPU-second.
+* inferences per CPU-second;
+* the active execution profile.
 
 A concurrency sweep can be used to identify where additional parallelism stops producing useful throughput and begins primarily increasing tail latency.
 
 Initial constrained-runtime experiments using a 0.5-core CPU limit and 512 MiB memory limit showed that the current workload becomes CPU constrained well before it becomes memory constrained.
 
-For the current rule-based and demo ONNX backends, concurrency 2 is a useful low-latency operating point under that resource budget. Higher concurrency can provide limited additional throughput but with substantially higher tail latency.
+Execution-profile experiments also showed that more ONNX threading is not automatically beneficial for a small model in a heavily constrained CPU environment. For the current demo workload, the single-threaded `eco` profile was frequently more throughput- and CPU-efficient than automatic ONNX threading.
 
 These measurements describe the current demo workload and host environment. They are not intended as general ONNX Runtime performance claims.
 
@@ -318,6 +362,16 @@ Install the default chart:
 helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
   --namespace edgepulse \
   --create-namespace
+```
+
+Select an ONNX execution profile with:
+
+```bash
+helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
+  --namespace edgepulse \
+  --create-namespace \
+  --set runtime.env.modelBackend=onnx \
+  --set runtime.env.executionProfile=eco
 ```
 
 The chart can deploy the bundled Mosquitto broker and supports secure MQTT configuration through **existing Kubernetes Secrets**. It does not generate production credentials or certificates.
@@ -373,31 +427,31 @@ See:
 ├── deploy/
 │   └── docker-compose/           # Secured local integration environment
 ├── docs/                         # Architecture, operations, benchmarking, security guides
-├── runtime/                      # FastAPI runtime, inference backends, tests
+├── runtime/                      # FastAPI runtime, inference backends, execution profiles, tests
 ├── scripts/                      # Benchmark, model, and Compose E2E utilities
 └── simulators/                   # Simulated edge-device producers
 ```
 
 ## Documentation map
 
-| Document                                         | Use it for                                                              |
-| ------------------------------------------------ | ----------------------------------------------------------------------- |
-| [Architecture](docs/architecture.md)             | Components, data paths, readiness, security boundaries.                 |
-| [Demo walkthrough](docs/demo-walkthrough.md)     | A concise technical demonstration of the project.                       |
-| [Local k3d/K3s](docs/k3d-k3s-local.md)           | Kubernetes validation on a workstation.                                 |
-| [Observability](docs/observability.md)           | Application/resource metrics, PromQL, Grafana, MQTT connectivity.       |
-| [Runtime benchmarking](docs/benchmarking.md)     | Throughput, latency, CPU/memory efficiency, and saturation experiments. |
-| [ServiceMonitor](docs/servicemonitor.md)         | Prometheus Operator integration.                                        |
-| [Security](docs/security.md)                     | Runtime, MQTT, Kubernetes, and CI security posture.                     |
-| [Container security](docs/container-security.md) | SBOM and vulnerability scan workflow.                                   |
-| [Release](docs/release.md)                       | Version-tagged GHCR publication workflow.                               |
-| [Image signing](docs/image-signing.md)           | Keyless Cosign signing and verification.                                |
-| [Troubleshooting](docs/troubleshooting.md)       | Runtime, MQTT, TLS, Compose, and Kubernetes diagnostics.                |
-| [Roadmap](docs/project-roadmap.md)               | Current state and next production-oriented increments.                  |
+| Document                                         | Use it for                                                                                 |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| [Architecture](docs/architecture.md)             | Components, data paths, readiness, security boundaries.                                    |
+| [Demo walkthrough](docs/demo-walkthrough.md)     | A concise technical demonstration of the project.                                          |
+| [Local k3d/K3s](docs/k3d-k3s-local.md)           | Kubernetes validation on a workstation.                                                    |
+| [Observability](docs/observability.md)           | Application/resource metrics, PromQL, Grafana, MQTT connectivity.                          |
+| [Runtime benchmarking](docs/benchmarking.md)     | Throughput, latency, execution-profile, CPU/memory efficiency, and saturation experiments. |
+| [ServiceMonitor](docs/servicemonitor.md)         | Prometheus Operator integration.                                                           |
+| [Security](docs/security.md)                     | Runtime, MQTT, Kubernetes, and CI security posture.                                        |
+| [Container security](docs/container-security.md) | SBOM and vulnerability scan workflow.                                                      |
+| [Release](docs/release.md)                       | Version-tagged GHCR publication workflow.                                                  |
+| [Image signing](docs/image-signing.md)           | Keyless Cosign signing and verification.                                                   |
+| [Troubleshooting](docs/troubleshooting.md)       | Runtime, MQTT, TLS, Compose, and Kubernetes diagnostics.                                   |
+| [Roadmap](docs/project-roadmap.md)               | Current state and next production-oriented increments.                                     |
 
 ## Scope
 
-EdgePulse is deliberately small enough to understand end to end. Its purpose is to demonstrate the operational path of an AI workload—from telemetry ingestion through inference, deployment, observability, resource management, benchmarking, security, and release—without hiding the core concepts behind a large framework.
+EdgePulse is deliberately small enough to understand end to end. Its purpose is to demonstrate the operational path of an AI workload—from telemetry ingestion through inference, deployment, observability, resource management, benchmarking, execution tuning, security, and release—without hiding the core concepts behind a large framework.
 
 It is not intended to be a complete device-management platform, training platform, or production MQTT PKI system.
 
