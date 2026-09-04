@@ -600,7 +600,7 @@ inferences / CPU-sec:   +2.5%
 
 INT8 was not faster at every load level.
 
-At concurrency 1, dynamic quantization overhead outweighed its compute benefits and produced worse latency than FP32.
+At concurrency 1, dynamic quantization overhead outweighed its compute benefits and produced worse latency than FP32. The INT8 weights use reduced-range per-channel quantization to avoid U8S8 saturation observed on non-VNNI x86 execution paths.
 
 The measured conclusion is therefore narrower:
 

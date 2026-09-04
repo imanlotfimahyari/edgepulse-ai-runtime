@@ -507,6 +507,7 @@ Mul
 ```
 
 The weights are stored as quantized INT8 tensors with per-channel scales and zero points.
+The quantizer uses reduced-range signed INT8 weights. This keeps the dynamically quantized U8S8 MatMul path portable across x86 CPUs where full-range U8S8 execution can otherwise suffer integer saturation.
 
 This is **dynamic quantization**, not static calibration-based quantization.
 

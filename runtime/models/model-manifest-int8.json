@@ -5,8 +5,8 @@
   "model_format": "onnx",
   "model_path": "models/anomaly_score_int8.onnx",
   "artifact_filename": "anomaly_score_int8.onnx",
-  "artifact_sha256": "b5a173c887f1ee9cd296dae433072df3d8c136f0a3eb7bad7f508f855b7d6e78",
+  "artifact_sha256": "b0aa4ff8da618dc43afe5a935597bc8ec61249adc665c78c4b7e2fc3ed9c8bea",
   "artifact_size_bytes": 40175,
-  "generated_at": "2026-09-03T17:33:14.040743+00:00",
+  "generated_at": "2026-09-04T08:31:18.197926+00:00",
   "description": "Dynamically quantized INT8 ONNX anomaly scoring model for EdgePulse edge-runtime efficiency experiments."
 }
