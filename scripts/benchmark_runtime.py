@@ -303,6 +303,17 @@ def main() -> int:
         args.timeout,
     )
 
+    model_manifest = model.get(
+        "model_manifest",
+        {},
+    )
+
+    if not isinstance(
+        model_manifest,
+        dict,
+    ):
+        model_manifest = {}
+
     if readiness.get("status") != "ready":
         raise RuntimeError(f"runtime is not ready: {readiness}")
 
@@ -431,7 +442,18 @@ def main() -> int:
             "model_name": model.get("model_name"),
             "model_version": model.get("model_version"),
             "model_backend": model.get("model_backend"),
+            "model_path": model.get("model_path"),
+            "model_manifest_path": model.get("model_manifest_path"),
             "execution_profile": model.get("execution_profile"),
+            "artifact_filename": model_manifest.get("artifact_filename"),
+            "artifact_size_bytes": model_manifest.get("artifact_size_bytes"),
+            "artifact_sha256": model_manifest.get("artifact_sha256"),
+            "artifact_sha256_verified": (
+                model_manifest.get("artifact_sha256_verified")
+            ),
+            "active_model_matches_manifest": (
+                model_manifest.get("active_model_matches_manifest")
+            ),
         },
         "workload": {
             "duration_seconds": elapsed,
@@ -502,6 +524,15 @@ def main() -> int:
     print("=" * 48)
 
     print(f"Backend             {model.get('model_backend')}")
+    print(f"Artifact            {model_manifest.get('artifact_filename', 'n/a')}")
+
+    artifact_size = model_manifest.get("artifact_size_bytes")
+
+    if isinstance(
+        artifact_size,
+        (int, float),
+    ):
+        print(f"Artifact size       {artifact_size} bytes")
     execution_profile = model.get(
         "execution_profile",
         {},

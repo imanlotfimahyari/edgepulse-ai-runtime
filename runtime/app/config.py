@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     model_backend: Literal["rule-based", "onnx"] = "rule-based"
     execution_profile: ExecutionProfileName = "balanced"
     model_path: str = "/app/models/anomaly_score.onnx"
+    model_manifest_path: str = "/app/models/model-manifest.json"
     anomaly_threshold: float = Field(default=0.65, ge=0.0, le=1.0)
 
     mqtt_enabled: bool = False

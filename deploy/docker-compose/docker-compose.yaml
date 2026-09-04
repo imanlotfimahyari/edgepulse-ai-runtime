@@ -37,6 +37,8 @@ services:
       MODEL_VERSION: ${MODEL_VERSION:-0.9.0}
       MODEL_BACKEND: ${MODEL_BACKEND:-rule-based}
       EXECUTION_PROFILE: ${EXECUTION_PROFILE:-balanced}
+      MODEL_PATH: ${MODEL_PATH:-/app/models/anomaly_score.onnx}
+      MODEL_MANIFEST_PATH: ${MODEL_MANIFEST_PATH:-/app/models/model-manifest.json}
       ANOMALY_THRESHOLD: ${ANOMALY_THRESHOLD:-0.65}
       MQTT_ENABLED: "true"
       MQTT_HOST: mqtt
