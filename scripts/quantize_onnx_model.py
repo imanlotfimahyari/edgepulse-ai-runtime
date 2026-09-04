@@ -43,6 +43,7 @@ def quantize_model(
             model_input=preprocessed_path,
             model_output=output_path,
             per_channel=True,
+            reduce_range=True,
             weight_type=QuantType.QInt8,
             op_types_to_quantize=[
                 "MatMul",
