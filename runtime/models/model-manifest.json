@@ -5,8 +5,8 @@
   "model_format": "onnx",
   "model_path": "models/anomaly_score.onnx",
   "artifact_filename": "anomaly_score.onnx",
-  "artifact_sha256": "a4b595306a4d185993cea50566acbb4a3895a283447d59f40caa5252c1c1b6d3",
-  "artifact_size_bytes": 270,
-  "generated_at": "2026-05-29T19:30:45.481035+00:00",
-  "description": "Demo ONNX anomaly scoring model for EdgePulse runtime."
+  "artifact_sha256": "98af7dc1bcb42a52f7d9cc345ddf8bbc33dd508f891ccd153efa118c15e4941b",
+  "artifact_size_bytes": 135289,
+  "generated_at": "2026-09-03T17:15:00.075972+00:00",
+  "description": "Deterministic weight-bearing FP32 ONNX anomaly scoring model for EdgePulse runtime optimization and quantization experiments."
 }
