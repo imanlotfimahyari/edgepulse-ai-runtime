@@ -13,6 +13,9 @@ def test_default_settings():
     assert settings.mqtt_password is None
     assert settings.mqtt_tls_enabled is False
     assert settings.execution_profile == "balanced"
+    assert settings.model_path == "/app/models/anomaly_score.onnx"
+
+    assert settings.model_manifest_path == "/app/models/model-manifest.json"
 
 
 def test_valid_onnx_backend():

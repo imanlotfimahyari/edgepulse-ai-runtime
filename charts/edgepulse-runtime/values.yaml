@@ -21,6 +21,7 @@ runtime:
     modelBackend: rule-based
     executionProfile: balanced
     modelPath: /app/models/anomaly_score.onnx
+    modelManifestPath: /app/models/model-manifest.json
     anomalyThreshold: "0.65"
     mqttEnabled: "true"
     mqttTopic: edge/devices/+/telemetry

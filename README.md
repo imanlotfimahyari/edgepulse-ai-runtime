@@ -23,6 +23,7 @@ Simulated edge devices
                                       - MQTT consumer
                                       - configuration validation
                                       - rule-based / ONNX inference
+                                      - FP32 / INT8 model artifacts
                                       - ONNX execution profiles
                                       - readiness / liveness
                                       - cgroup resource awareness
@@ -39,6 +40,12 @@ The repository demonstrates:
 
 * HTTP and MQTT telemetry ingestion;
 * local rule-based and ONNX Runtime inference;
+* deterministic generation of a weight-bearing FP32 ONNX model;
+* dynamic INT8 quantization for CPU inference;
+* numerical comparison of FP32 and INT8 model variants;
+* model artifact manifests with checksum verification;
+* explicit model-path and manifest-path selection;
+* runtime detection of model/manifest selection mismatches;
 * validated runtime configuration;
 * health and dependency-aware readiness checks;
 * resilient MQTT reconnect behavior;
@@ -79,7 +86,7 @@ ghcr.io/imanlotfimahyari/edgepulse-runtime:0.9.0
 | ----------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `GET /healthz`    | Liveness: confirms that the process is running.                                                                     |
 | `GET /readyz`     | Readiness: confirms that the runtime can serve inference; when MQTT is enabled, MQTT connectivity is also required. |
-| `GET /model/info` | Returns model, backend, manifest, and execution-profile metadata.                                                   |
+| `GET /model/info` | Returns model, active artifact, manifest verification, backend, and execution-profile metadata.                     |
 | `POST /infer`     | Runs inference for HTTP telemetry.                                                                                  |
 | `GET /metrics`    | Exposes Prometheus-compatible application and resource metrics.                                                     |
 
@@ -99,6 +106,109 @@ MODEL_BACKEND=onnx
 ```
 
 When ONNX mode is selected, the runtime loads the configured model during application startup. A model initialization failure makes `/readyz` report not ready.
+
+## ONNX model variants
+
+EdgePulse packages two ONNX artifacts:
+
+| Variant | Artifact                                 |          Size | Purpose                                     |
+| ------- | ---------------------------------------- | ------------: | ------------------------------------------- |
+| FP32    | `runtime/models/anomaly_score.onnx`      | 135,289 bytes | Reference weight-bearing FP32 model.        |
+| INT8    | `runtime/models/anomaly_score_int8.onnx` |  40,175 bytes | Dynamically quantized CPU-oriented variant. |
+
+The INT8 artifact is approximately **70.3% smaller** than the FP32 artifact.
+
+The FP32 model is deterministic and intentionally synthetic. It preserves the original EdgePulse anomaly-score semantics while introducing real weight tensors and matrix operations that make model optimization and quantization experiments meaningful.
+
+The model is not presented as a trained production anomaly detector. Its purpose is to provide a realistic inference artifact for studying deployment, runtime behavior, model packaging, quantization, resource constraints, and operational tooling.
+
+Generate the FP32 artifact with:
+
+```bash
+python scripts/create_onnx_model.py
+```
+
+Generate the INT8 variant with:
+
+```bash
+python scripts/quantize_onnx_model.py
+```
+
+Compare their numerical behavior with:
+
+```bash
+python scripts/compare_onnx_models.py
+```
+
+The validation sweep used 1,501 score points across the range `0.0` to `1.5`.
+
+Observed results:
+
+```text
+mean absolute error:       ~0.000117
+p95 absolute error:        ~0.000222
+maximum absolute error:    ~0.000234
+classification mismatches: 0 / 1501
+```
+
+These results describe the current deterministic EdgePulse model only.
+
+### Selecting the active artifact
+
+The model and its manifest are selected independently but are expected to match:
+
+```text
+MODEL_PATH
+MODEL_MANIFEST_PATH
+```
+
+FP32:
+
+```bash
+MODEL_BACKEND=onnx \
+MODEL_PATH=/app/models/anomaly_score.onnx \
+MODEL_MANIFEST_PATH=/app/models/model-manifest.json \
+docker compose \
+  -f deploy/docker-compose/docker-compose.yaml \
+  up -d --build edgepulse-runtime
+```
+
+INT8:
+
+```bash
+MODEL_BACKEND=onnx \
+MODEL_PATH=/app/models/anomaly_score_int8.onnx \
+MODEL_MANIFEST_PATH=/app/models/model-manifest-int8.json \
+docker compose \
+  -f deploy/docker-compose/docker-compose.yaml \
+  up -d --build edgepulse-runtime
+```
+
+`GET /model/info` reports both the selected paths and manifest verification state.
+
+Relevant fields include:
+
+```text
+model_path
+model_manifest_path
+artifact_filename
+artifact_size_bytes
+artifact_sha256
+artifact_sha256_verified
+active_model_matches_manifest
+```
+
+This distinguishes two different checks:
+
+```text
+artifact_sha256_verified
+    -> the artifact described by the manifest has the expected content
+
+active_model_matches_manifest
+    -> the runtime is actually serving the artifact described by that manifest
+```
+
+This prevents a valid FP32 manifest from being mistaken for verification of an active INT8 model, or vice versa.
 
 ## ONNX execution profiles
 
@@ -139,7 +249,19 @@ GET /model/info
 
 Execution profiles apply only to the ONNX backend. When the rule-based backend is selected, the configured profile is reported but marked inactive.
 
-The profiles were selected through benchmark experiments rather than assumed from their names. More aggressive parallel and latency-oriented candidates were tested and rejected because they did not provide useful tradeoffs for the current small ONNX graph under the constrained test budget.
+The profiles were selected through benchmark experiments rather than assumed from their names. More aggressive parallel and latency-oriented candidates were tested and rejected because they did not provide useful tradeoffs for the constrained test budget.
+
+Execution-profile tuning and model quantization are separate concerns:
+
+```text
+model variant
+    -> FP32 or INT8 representation
+
+execution profile
+    -> how ONNX Runtime uses available CPU resources
+```
+
+The FP32-versus-INT8 comparison uses the same `eco` execution profile so the model representation is the primary changed variable.
 
 ## Quick start: secured Docker Compose stack
 
@@ -418,17 +540,98 @@ The benchmark measures:
 * average and maximum observed memory;
 * memory budget and headroom;
 * inferences per CPU-second;
-* the active execution profile.
+* the active execution profile;
+* active model path and manifest path;
+* artifact filename and size;
+* artifact SHA-256 and verification state;
+* whether the active model matches the selected manifest.
 
 A concurrency sweep can be used to identify where additional parallelism stops producing useful throughput and begins primarily increasing tail latency.
 
-Initial constrained-runtime experiments using a 0.5-core CPU limit and 512 MiB memory limit showed that the current workload becomes CPU constrained well before it becomes memory constrained.
+Under the constrained test envelope:
 
-Execution-profile experiments also showed that more ONNX threading is not automatically beneficial for a small model in a heavily constrained CPU environment. For the current demo workload, the single-threaded `eco` profile was frequently more throughput- and CPU-efficient than automatic ONNX threading.
+```text
+CPU:     0.5 core
+Memory:  512 MiB
+```
 
-These measurements describe the current demo workload and host environment. They are not intended as general ONNX Runtime performance claims.
+concurrency 2 remains a useful low-latency operating point for the current ONNX workload.
 
-See [docs/benchmarking.md](docs/benchmarking.md) for methodology, metrics, reproducibility guidance, and interpretation.
+Higher concurrency values are useful as diagnostic stress points. They show where the CPU quota is saturated and requests increasingly wait for CPU rather than producing proportional throughput gains.
+
+### FP32 versus INT8
+
+The final comparison fixed:
+
+```text
+backend:            ONNX
+execution profile:  eco
+CPU:                0.5 core
+memory:             512 MiB
+warm-up:            2 seconds
+duration:           20 seconds
+repetitions:        3
+concurrency:        1, 2, 4, 8
+```
+
+Representative median results:
+
+| Variant |  C | Throughput req/s | Client p95 | Inference p95 | CPU budget | Avg memory | Infer/CPU-s |
+| ------- | -: | ---------------: | ---------: | ------------: | ---------: | ---------: | ----------: |
+| FP32    |  1 |           463.42 |   2.575 ms |      0.163 ms |      88.7% |   64.2 MiB |     1033.33 |
+| FP32    |  2 |           471.48 |   4.422 ms |      0.434 ms |      97.4% |   64.1 MiB |      968.17 |
+| FP32    |  4 |           488.95 |  48.472 ms |      0.804 ms |      97.4% |   64.8 MiB |     1004.11 |
+| FP32    |  8 |           494.80 |  63.506 ms |      1.198 ms |      97.3% |   65.5 MiB |     1017.27 |
+| INT8    |  1 |           458.48 |   3.619 ms |      0.265 ms |      90.6% |   59.5 MiB |     1021.75 |
+| INT8    |  2 |           484.89 |   4.199 ms |      0.411 ms |      97.3% |   59.3 MiB |      992.01 |
+| INT8    |  4 |           505.94 |  48.792 ms |      0.776 ms |      97.2% |   60.0 MiB |     1041.38 |
+| INT8    |  8 |           506.13 |  63.664 ms |      1.159 ms |      97.4% |   60.9 MiB |     1039.63 |
+
+At concurrency 2, INT8 provided approximately:
+
+```text
+artifact size:         -70.3%
+throughput:             +2.8%
+client p95 latency:     -5.0%
+inference p95 latency:  -5.3%
+average memory:         -7.5%
+inferences / CPU-sec:   +2.5%
+```
+
+INT8 was not faster at every load level.
+
+At concurrency 1, dynamic quantization overhead outweighed its compute benefits and produced worse latency than FP32.
+
+The measured conclusion is therefore narrower:
+
+> Dynamic INT8 quantization substantially reduces model footprint and modestly improves memory and CPU efficiency under moderate and saturated load, but it is not universally faster than FP32.
+
+### ONNX memory-policy experiment
+
+CPU memory-arena and memory-pattern settings were also tested as possible edge-memory optimizations.
+
+An initial repeated-process experiment appeared to show a large memory saving when allocator features were disabled.
+
+The result did not survive a stricter confirmation experiment that restarted the runtime before every repetition.
+
+Fresh-process medians at concurrency 2 were:
+
+| Policy                       |   Throughput | Client p95 | Avg memory | Max memory |
+| ---------------------------- | -----------: | ---------: | ---------: | ---------: |
+| Default ONNX memory behavior | 487.66 req/s |   4.488 ms |   59.4 MiB |   72.5 MiB |
+| CPU memory arena disabled    | 489.95 req/s |   5.475 ms |   59.2 MiB |   71.8 MiB |
+
+The memory difference was negligible, while p95 latency was worse with the CPU memory arena disabled.
+
+The implementation therefore keeps ONNX Runtime's default memory behavior and does **not** expose a separate memory profile.
+
+This is an intentional negative result: configuration was rejected because its apparent benefit was not repeatable under stricter experimental isolation.
+
+Execution-profile experiments also showed that more ONNX threading is not automatically beneficial in a heavily constrained CPU environment.
+
+These measurements describe the current EdgePulse workload and host environment. They are not intended as general ONNX Runtime performance claims.
+
+See [docs/benchmarking.md](docs/benchmarking.md) for methodology, historical execution-profile experiments, repeatability guidance, and interpretation.
 
 ## Kubernetes and Helm
 
@@ -461,6 +664,18 @@ helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
   --create-namespace \
   --set runtime.env.modelBackend=onnx \
   --set runtime.env.executionProfile=eco
+```
+
+Select the INT8 model and matching manifest with:
+
+```bash
+helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
+  --namespace edgepulse \
+  --create-namespace \
+  --set runtime.env.modelBackend=onnx \
+  --set runtime.env.executionProfile=eco \
+  --set runtime.env.modelPath=/app/models/anomaly_score_int8.onnx \
+  --set runtime.env.modelManifestPath=/app/models/model-manifest-int8.json
 ```
 
 The chart can deploy the bundled Mosquitto broker and supports secure MQTT configuration through **existing Kubernetes Secrets**. It does not generate production credentials or certificates.
@@ -523,27 +738,29 @@ See:
 
 ## Documentation map
 
-| Document                                         | Use it for                                                                                 |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| [Architecture](docs/architecture.md)             | Components, data paths, readiness, security boundaries.                                    |
-| [Demo walkthrough](docs/demo-walkthrough.md)     | A concise technical demonstration of the project.                                          |
-| [Local k3d/K3s](docs/k3d-k3s-local.md)           | Kubernetes validation on a workstation.                                                    |
-| [Observability](docs/observability.md)           | Application/resource metrics, PromQL, Grafana, MQTT connectivity.                          |
-| [`edgepulse-top`](docs/edgepulse-top.md)         | Live node-local operational TUI, rates, trends, and degraded telemetry behavior.           |
-| [Runtime benchmarking](docs/benchmarking.md)     | Throughput, latency, execution-profile, CPU/memory efficiency, and saturation experiments. |
-| [ServiceMonitor](docs/servicemonitor.md)         | Prometheus Operator integration.                                                           |
-| [Security](docs/security.md)                     | Runtime, MQTT, Kubernetes, and CI security posture.                                        |
-| [Container security](docs/container-security.md) | SBOM and vulnerability scan workflow.                                                      |
-| [Release](docs/release.md)                       | Version-tagged GHCR publication workflow.                                                  |
-| [Image signing](docs/image-signing.md)           | Keyless Cosign signing and verification.                                                   |
-| [Troubleshooting](docs/troubleshooting.md)       | Runtime, MQTT, TLS, Compose, and Kubernetes diagnostics.                                   |
-| [Roadmap](docs/project-roadmap.md)               | Current state and next production-oriented increments.                                     |
+| Document                                         | Use it for                                                                                        |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| [Architecture](docs/architecture.md)             | Components, data paths, readiness, security boundaries.                                           |
+| [Demo walkthrough](docs/demo-walkthrough.md)     | A concise technical demonstration of the project.                                                 |
+| [Local k3d/K3s](docs/k3d-k3s-local.md)           | Kubernetes validation on a workstation.                                                           |
+| [Observability](docs/observability.md)           | Application/resource metrics, PromQL, Grafana, MQTT connectivity.                                 |
+| [`edgepulse-top`](docs/edgepulse-top.md)         | Live node-local operational TUI, rates, trends, and degraded telemetry behavior.                  |
+| [Runtime benchmarking](docs/benchmarking.md)     | Saturation, execution profiles, FP32/INT8 comparison, resource efficiency, and experiment design. |
+| [ServiceMonitor](docs/servicemonitor.md)         | Prometheus Operator integration.                                                                  |
+| [Security](docs/security.md)                     | Runtime, MQTT, Kubernetes, and CI security posture.                                               |
+| [Container security](docs/container-security.md) | SBOM and vulnerability scan workflow.                                                             |
+| [Release](docs/release.md)                       | Version-tagged GHCR publication workflow.                                                         |
+| [Image signing](docs/image-signing.md)           | Keyless Cosign signing and verification.                                                          |
+| [Troubleshooting](docs/troubleshooting.md)       | Runtime, MQTT, TLS, Compose, and Kubernetes diagnostics.                                          |
+| [Roadmap](docs/project-roadmap.md)               | Current state and next production-oriented increments.                                            |
 
 ## Scope
 
-EdgePulse is deliberately small enough to understand end to end. Its purpose is to demonstrate the operational path of an AI workload—from telemetry ingestion through inference, deployment, observability, resource management, benchmarking, execution tuning, local operations, security, and release—without hiding the core concepts behind a large framework.
+EdgePulse is deliberately small enough to understand end to end. Its purpose is to demonstrate the operational path of an AI workload—from telemetry ingestion through inference, model packaging and optimization, deployment, observability, resource management, benchmarking, execution tuning, local operations, security, and release—without hiding the core concepts behind a large framework.
 
 It is not intended to be a complete device-management platform, training platform, or production MQTT PKI system.
+
+The packaged ONNX model is an infrastructure workload rather than a claim of production ML quality. A trained domain model can later replace it without redesigning the surrounding runtime, deployment, manifest, quantization, observability, or benchmarking layers.
 
 ## License
 

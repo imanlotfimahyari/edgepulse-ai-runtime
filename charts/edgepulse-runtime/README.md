@@ -57,10 +57,70 @@ runtime:
     modelBackend: rule-based
     executionProfile: balanced
     modelPath: /app/models/anomaly_score.onnx
+    modelManifestPath: /app/models/model-manifest.json
     anomalyThreshold: "0.65"
     mqttEnabled: "true"
     mqttTopic: edge/devices/+/telemetry
 ```
+
+`modelPath` and `modelManifestPath` should describe the same artifact.
+
+The runtime reports whether they match through:
+
+```text
+GET /model/info
+```
+
+Relevant fields include:
+
+```text
+artifact_sha256_verified
+active_model_matches_manifest
+```
+
+## ONNX model variants
+
+The runtime image contains two ONNX model variants.
+
+### FP32
+
+```text
+/app/models/anomaly_score.onnx
+/app/models/model-manifest.json
+```
+
+Example:
+
+```bash
+helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
+  --namespace edgepulse \
+  --create-namespace \
+  --set runtime.env.modelBackend=onnx \
+  --set runtime.env.modelPath=/app/models/anomaly_score.onnx \
+  --set runtime.env.modelManifestPath=/app/models/model-manifest.json
+```
+
+### INT8
+
+```text
+/app/models/anomaly_score_int8.onnx
+/app/models/model-manifest-int8.json
+```
+
+Example:
+
+```bash
+helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
+  --namespace edgepulse \
+  --create-namespace \
+  --set runtime.env.modelBackend=onnx \
+  --set runtime.env.modelPath=/app/models/anomaly_score_int8.onnx \
+  --set runtime.env.modelManifestPath=/app/models/model-manifest-int8.json
+```
+
+The INT8 model is dynamically quantized and is approximately 70% smaller than the FP32 artifact for the current EdgePulse model.
+
+Model-path selection is independent from Kubernetes resource limits and from the ONNX execution profile.
 
 ## ONNX execution profile
 
@@ -98,6 +158,18 @@ helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
   --create-namespace \
   --set runtime.env.modelBackend=onnx \
   --set runtime.env.executionProfile=eco
+```
+
+A complete constrained INT8 example is:
+
+```bash
+helm upgrade --install edgepulse-runtime charts/edgepulse-runtime \
+  --namespace edgepulse \
+  --create-namespace \
+  --set runtime.env.modelBackend=onnx \
+  --set runtime.env.executionProfile=eco \
+  --set runtime.env.modelPath=/app/models/anomaly_score_int8.onnx \
+  --set runtime.env.modelManifestPath=/app/models/model-manifest-int8.json
 ```
 
 Verify the deployed configuration:
@@ -255,6 +327,8 @@ runtime:
   env:
     modelBackend: onnx
     executionProfile: eco
+    modelPath: /app/models/anomaly_score_int8.onnx
+    modelManifestPath: /app/models/model-manifest-int8.json
 
   mqtt:
     auth:
@@ -305,6 +379,8 @@ The chart uses:
 
 When MQTT is enabled, runtime readiness requires an active MQTT connection.
 
+For the ONNX backend, startup readiness also depends on successful model initialization.
+
 ## Resource defaults
 
 The runtime has default requests and limits:
@@ -320,7 +396,7 @@ runtime:
       memory: 512Mi
 ```
 
-These Kubernetes resource limits are independent from `executionProfile`.
+These Kubernetes resource limits are independent from `executionProfile` and model representation.
 
 ```text
 Kubernetes resources
@@ -328,6 +404,9 @@ Kubernetes resources
 
 executionProfile
     -> how ONNX Runtime uses the available compute
+
+modelPath + modelManifestPath
+    -> which packaged inference artifact is active
 ```
 
 This distinction is intentional.

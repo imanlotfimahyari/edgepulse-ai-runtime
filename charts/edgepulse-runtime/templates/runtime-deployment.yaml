@@ -60,6 +60,8 @@ spec:
               value: {{ .Values.runtime.env.executionProfile | quote }}
             - name: MODEL_PATH
               value: {{ .Values.runtime.env.modelPath | quote }}
+            - name: MODEL_MANIFEST_PATH
+              value: {{ .Values.runtime.env.modelManifestPath | quote }}
             - name: ANOMALY_THRESHOLD
               value: {{ .Values.runtime.env.anomalyThreshold | quote }}
             - name: MQTT_ENABLED

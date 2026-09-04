@@ -53,6 +53,12 @@ def test_model_info(client: TestClient) -> None:
     assert "execution_profile" in body
     assert body["execution_profile"]["name"] == settings.execution_profile
     assert "active" in body["execution_profile"]
+    assert "model_path" in body
+    assert "model_manifest_path" in body
+
+    assert body["model_path"] == settings.model_path
+
+    assert body["model_manifest_path"] == settings.model_manifest_path
 
 
 def test_infer_valid_request(client: TestClient) -> None:

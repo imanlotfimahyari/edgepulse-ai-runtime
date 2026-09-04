@@ -118,12 +118,17 @@ def model_info() -> dict[str, Any]:
         "model_name": settings.model_name,
         "model_version": settings.model_version,
         "model_backend": settings.model_backend,
+        "model_path": settings.model_path,
+        "model_manifest_path": settings.model_manifest_path,
         "anomaly_threshold": settings.anomaly_threshold,
         "execution_profile": {
             **execution_profile.as_dict(),
             "active": settings.model_backend == "onnx",
         },
-        "model_manifest": load_model_manifest(),
+        "model_manifest": load_model_manifest(
+            settings.model_manifest_path,
+            active_model_path=settings.model_path,
+        ),
     }
 
 

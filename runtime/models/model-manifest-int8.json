@@ -1,0 +1,12 @@
+{
+  "model_name": "edgepulse-anomaly-detector",
+  "model_version": "0.9.0",
+  "model_backend": "onnxruntime",
+  "model_format": "onnx",
+  "model_path": "models/anomaly_score_int8.onnx",
+  "artifact_filename": "anomaly_score_int8.onnx",
+  "artifact_sha256": "b5a173c887f1ee9cd296dae433072df3d8c136f0a3eb7bad7f508f855b7d6e78",
+  "artifact_size_bytes": 40175,
+  "generated_at": "2026-09-03T17:33:14.040743+00:00",
+  "description": "Dynamically quantized INT8 ONNX anomaly scoring model for EdgePulse edge-runtime efficiency experiments."
+}
