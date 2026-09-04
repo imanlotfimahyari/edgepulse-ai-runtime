@@ -100,6 +100,7 @@ def test_metrics(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert "edgepulse_" in response.text
+    assert "edgepulse_model_runtime_info" in response.text
 
 
 def test_readyz_reports_not_ready_when_initialization_fails(monkeypatch) -> None:
