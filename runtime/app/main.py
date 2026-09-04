@@ -8,7 +8,11 @@ from typing import Any
 from app import inference
 from app.config import settings
 from app.execution_profiles import get_execution_profile
-from app.metrics import MODEL_ARTIFACT_SIZE, MODEL_INFO
+from app.metrics import (
+    MODEL_ARTIFACT_SIZE,
+    MODEL_INFO,
+    MODEL_RUNTIME_INFO,
+)
 from app.model_manifest import load_model_manifest
 from app.mqtt_consumer import is_mqtt_connected, start_mqtt_consumer
 from app.schemas import InferenceRequest, InferenceResponse
@@ -29,6 +33,15 @@ async def lifespan(_app: FastAPI):
     try:
         model_path = Path(settings.model_path)
 
+        model_manifest = load_model_manifest(
+            settings.model_manifest_path,
+            active_model_path=settings.model_path,
+        )
+
+        execution_profile = get_execution_profile(
+            settings.execution_profile,
+        )
+
         if model_path.is_file():
             MODEL_ARTIFACT_SIZE.set(model_path.stat().st_size)
         else:
@@ -39,6 +52,36 @@ async def lifespan(_app: FastAPI):
 
         if settings.mqtt_enabled:
             start_mqtt_consumer()
+
+        MODEL_RUNTIME_INFO.labels(
+            artifact_filename=str(
+                model_manifest.get(
+                    "artifact_filename",
+                    model_path.name,
+                )
+            ),
+            execution_profile=(
+                execution_profile.name
+                if settings.model_backend == "onnx"
+                else "inactive"
+            ),
+            artifact_sha256_verified=str(
+                bool(
+                    model_manifest.get(
+                        "artifact_sha256_verified",
+                        False,
+                    )
+                )
+            ).lower(),
+            active_model_matches_manifest=str(
+                bool(
+                    model_manifest.get(
+                        "active_model_matches_manifest",
+                        False,
+                    )
+                )
+            ).lower(),
+        ).set(1)
 
         runtime_ready = True
         readiness_error = None

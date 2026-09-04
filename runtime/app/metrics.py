@@ -45,6 +45,17 @@ MODEL_INFO = Gauge(
     ["model_name", "model_version", "model_backend"],
 )
 
+MODEL_RUNTIME_INFO = Gauge(
+    "edgepulse_model_runtime_info",
+    "Active model artifact and execution policy metadata.",
+    [
+        "artifact_filename",
+        "execution_profile",
+        "artifact_sha256_verified",
+        "active_model_matches_manifest",
+    ],
+)
+
 DEVICE_MESSAGES = Counter(
     "edgepulse_device_messages_total",
     "Total number of device messages received.",
